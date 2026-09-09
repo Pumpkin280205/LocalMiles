@@ -1,28 +1,55 @@
 package com.example.localmiles.Core.Data.Repository
 
 import com.example.localmiles.Core.Network.ApiService
+import com.example.localmiles.Core.Network.Dto.JobStatusRequest
+import com.example.localmiles.Core.Network.Dto.JobUpsertRequest
 import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Network.RetrofitClient
 import com.example.localmiles.Core.Utils.Result
 import com.example.localmiles.Core.Utils.SessionManager
 
-/**
- * Read access to delivery jobs. Unwraps the API's { jobs, ... } / { job }
- * envelopes so callers just get the payload.
- *
- * Call site until Hilt is wired up:
- *     val jobRepo = JobRepository(SessionManager(context))
- */
 class JobRepository(
     session: SessionManager,
     private val api: ApiService = RetrofitClient.getApiService(session),
 ) {
 
-    /** GET jobs — every job visible to the logged-in user's role. */
-    suspend fun getJobs(): Result<List<JobResponse>> =
-        apiCall { api.getJobs().jobs }
+    suspend fun getJobs(
+        status: String? = null,
+        priority: String? = null,
+        clientId: Long? = null,
+        driverId: Long? = null,
+        vehicleId: Long? = null,
+        depotId: Long? = null,
+        scheduledFrom: String? = null,
+        scheduledTo: String? = null,
+        mine: Boolean? = null,
+        limit: Int? = null,
+        offset: Int? = null,
+    ): Result<List<JobResponse>> =
+        apiCall {
+            api.getJobs(
+                status, priority, clientId, driverId, vehicleId, depotId,
+                scheduledFrom, scheduledTo, mine, limit, offset,
+            ).jobs
+        }
 
-    /** GET jobs/{id} — one job, or Result.Error if it is missing / not visible. */
-    suspend fun getJob(id: String): Result<JobResponse> =
+    //GET jobs/{id}.
+    suspend fun getJob(id: Long): Result<JobResponse> =
         apiCall { api.getJob(id).job }
+
+    // POST jobs — admin only.
+    suspend fun createJob(body: JobUpsertRequest): Result<JobResponse> =
+        apiCall { api.createJob(body).job }
+
+    //PATCH jobs/{id} — admin only. Only the non-null fields of [body] are sent.
+    suspend fun updateJob(id: Long, body: JobUpsertRequest): Result<JobResponse> =
+        apiCall { api.updateJob(id, body).job }
+
+    //PATCH jobs/{id}/status — assigned driver or admin.
+    suspend fun updateStatus(id: Long, status: String): Result<JobResponse> =
+        apiCall { api.updateJobStatus(id, JobStatusRequest(status)).job }
+
+    //DELETE jobs/{id} — admin only. Sets Status = "Cancelled".
+    suspend fun cancelJob(id: Long): Result<JobResponse> =
+        apiCall { api.cancelJob(id).job }
 }
