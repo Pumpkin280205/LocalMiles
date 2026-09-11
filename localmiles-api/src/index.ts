@@ -42,6 +42,7 @@ import {
   cancelStop,
 } from './controllers/stopController.js';
 import { getJobRoute } from './controllers/routeController.js';
+import { updateMe } from './controllers/userController.js';
 import {
   podUpload,
   submitPod,
@@ -76,6 +77,9 @@ app.post('/api/auth/login', loginHandler);
 
 // --- Everything below requires a valid JWT ---
 app.use(requireAuth);
+
+// Self-service profile: any authenticated user edits their own row only.
+app.patch('/api/users/me', updateMe);
 
 // Depots: any authenticated user can read; only admins can mutate.
 app.get('/api/depots', listDepots);

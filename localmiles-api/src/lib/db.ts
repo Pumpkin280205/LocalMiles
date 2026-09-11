@@ -1,5 +1,6 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
+import { ROLE } from '../middleware/auth.js';
 
 /** Parse a positive-integer path param (bigint identity PK). Returns null if not valid. */
 export function parseId(raw: string | string[] | undefined): number | null {
@@ -28,7 +29,38 @@ export async function driverIdForUser(userId: number): Promise<number | null> {
   return data ? data.DriverId : null;
 }
 
-/** Postgres SQLSTATEs surfaced by PostgREST that we want to turn into 4xx, not 500. */
+/** Resolve the Client.ClientId linked to a given User, or null if the user isn't a client. */
+export async function clientIdForUser(userId: number): Promise<number | null> {
+  const { data } = await supabase
+    .from('Client')
+    .select('ClientId')
+    .eq('UserId', userId)
+    .maybeSingle();
+  return data ? data.ClientId : null;
+}
+
+/**
+ * RBAC read-scoping: can this caller see a job with the given DriverId/ClientId?
+ * Admins see everything; a driver only their own assigned jobs; a client only
+ * their own jobs. Used to gate reads on DeliveryJob/DeliveryStop/ProofOfDelivery.
+ */
+export async function userCanAccessJob(
+  req: Request,
+  job: { DriverId: number | null; ClientId: number }
+): Promise<boolean> {
+  const role = req.user!.role;
+  if (role === ROLE.ADMIN) return true;
+  if (role === ROLE.DRIVER) {
+    const driverId = await driverIdForUser(Number(req.user!.id));
+    return driverId !== null && job.DriverId === driverId;
+  }
+  if (role === ROLE.CLIENT) {
+    const clientId = await clientIdForUser(Number(req.user!.id));
+    return clientId !== null && job.ClientId === clientId;
+  }
+  return false;
+}
+
 const PG = {
   UNIQUE_VIOLATION: '23505',
   FK_VIOLATION: '23503',
@@ -36,10 +68,6 @@ const PG = {
   NOT_NULL_VIOLATION: '23502',
 } as const;
 
-/**
- * Translate a Supabase/PostgREST write error into an HTTP response.
- * Constraint violations become 409/400 with the DB detail; anything else is a 500.
- */
 export function writeError(res: Response, error: any, fallbackMessage: string) {
   const code: string | undefined = error?.code;
   const detail: string = error?.details || error?.message || 'unknown error';

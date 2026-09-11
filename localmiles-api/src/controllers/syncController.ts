@@ -2,8 +2,9 @@ import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
 import { writeError, driverIdForUser } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
-import { JOB_STATUSES } from './jobController.js';
-import { STOP_STATUSES } from './stopController.js';
+import { JOB_STATUSES, isValidJobTransition } from './jobController.js';
+import { STOP_STATUSES, isValidStopTransition } from './stopController.js';
+import { notifySyncIssue } from '../lib/notifications.js';
 
 const TABLE = 'OfflineSyncAction';
 const PK = 'SyncActionId';
@@ -78,7 +79,7 @@ async function dispatch(
         return { status: 'Failed', error: `Payload.Status must be one of: ${JOB_STATUSES.join(', ')}` };
 
       const { data: job, error } = await supabase
-        .from('DeliveryJob').select('JobId, DriverId').eq('JobId', entityId).maybeSingle();
+        .from('DeliveryJob').select('JobId, DriverId, Status').eq('JobId', entityId).maybeSingle();
       if (error) return { status: 'Failed', error: error.message };
       if (!job) return { status: 'Failed', error: 'Job not found' };
 
@@ -90,6 +91,9 @@ async function dispatch(
           return { status: 'Failed', error: `Drivers may only set: ${DRIVER_JOB_STATUSES.join(', ')}` };
       }
 
+      if (!isValidJobTransition(job.Status, Status))
+        return { status: 'Failed', error: `Cannot transition job from ${job.Status} to ${Status}` };
+
       const upd = await supabase.from('DeliveryJob').update({ Status }).eq('JobId', entityId);
       if (upd.error) return { status: 'Failed', error: upd.error.message };
       return { status: 'Completed', error: null };
@@ -98,11 +102,14 @@ async function dispatch(
     case 'UpdateStopStatus': {
       if (!wantInt) return { status: 'Failed', error: 'EntityId must be a stop id' };
       const Status = (action.Payload as any).Status;
+      const FailureReason = (action.Payload as any).FailureReason;
       if (!STOP_STATUSES.includes(Status))
         return { status: 'Failed', error: `Payload.Status must be one of: ${STOP_STATUSES.join(', ')}` };
+      if (Status === 'Failed' && (typeof FailureReason !== 'string' || !FailureReason.trim()))
+        return { status: 'Failed', error: 'Payload.FailureReason is required when Status is Failed' };
 
       const { data: stop, error } = await supabase
-        .from('DeliveryStop').select('StopId, ArrivedAt, DeliveryJob(DriverId)').eq('StopId', entityId).maybeSingle();
+        .from('DeliveryStop').select('StopId, Status, ArrivedAt, DeliveryJob(DriverId)').eq('StopId', entityId).maybeSingle();
       if (error) return { status: 'Failed', error: error.message };
       if (!stop) return { status: 'Failed', error: 'Stop not found' };
 
@@ -115,6 +122,9 @@ async function dispatch(
           return { status: 'Failed', error: `Drivers may only set: ${DRIVER_STOP_STATUSES.join(', ')}` };
       }
 
+      if (!isValidStopTransition((stop as any).Status, Status))
+        return { status: 'Failed', error: `Cannot transition stop from ${(stop as any).Status} to ${Status}` };
+
       const now = new Date().toISOString();
       const patch: Record<string, unknown> = { Status };
       if (Status === 'Arrived' && !(stop as any).ArrivedAt) patch.ArrivedAt = now;
@@ -122,6 +132,7 @@ async function dispatch(
         if (!(stop as any).ArrivedAt) patch.ArrivedAt = now;
         patch.CompletedAt = now;
       }
+      if (Status === 'Failed') patch.FailureReason = FailureReason.trim();
       const upd = await supabase.from('DeliveryStop').update(patch).eq('StopId', entityId);
       if (upd.error) return { status: 'Failed', error: upd.error.message };
       return { status: 'Completed', error: null };
@@ -173,17 +184,13 @@ async function processAction(action: SyncAction, req: Request): Promise<ActionOu
 
   if (status === 'Pending')
     return { SyncActionId: action.SyncActionId, outcome: 'queued', status };
-  if (status === 'Failed')
+  if (status === 'Failed') {
+    await notifySyncIssue(callerId(req), action.SyncActionId, error);
     return { SyncActionId: action.SyncActionId, outcome: 'failed', status, error: error ?? undefined };
+  }
   return { SyncActionId: action.SyncActionId, outcome: 'applied', status };
 }
 
-/**
- * POST /api/sync
- * Body: { actions: SyncAction[] }  (1..50). Each action carries a client-generated
- * UUID; already-seen UUIDs are reported as `duplicate` and never re-applied.
- * Always 200 with a per-action results array (unless the body itself is malformed).
- */
 export async function submitSync(req: Request, res: Response) {
   const actions = req.body?.actions;
   if (!Array.isArray(actions) || actions.length === 0)
@@ -269,6 +276,8 @@ export async function retrySync(req: Request, res: Response) {
     ErrorMessage: applyErr,
   }).eq(PK, row.SyncActionId).select().single();
   if (updErr) return writeError(res, updErr, 'Could not update sync action');
+
+  if (status === 'Failed') await notifySyncIssue(row.UserId, row.SyncActionId, applyErr);
 
   return res.json({ action: updated });
 }

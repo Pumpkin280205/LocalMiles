@@ -8,13 +8,10 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not set in the environment');
 }
 
-/**
- * Canonical role strings stored in User.Role. If your real data uses different
- * casing (e.g. 'Admin'), change it here in one place.
- */
 export const ROLE = {
   ADMIN: 'admin',
   DRIVER: 'driver',
+  CLIENT: 'client',
 } as const;
 
 /** Shape of what we put on req.user — mirrors the payload signed in authController. */
@@ -23,7 +20,6 @@ export interface AuthUser {
   role: string;
 }
 
-// Teach TypeScript that every Express request may carry a `user`.
 declare global {
   namespace Express {
     interface Request {
@@ -62,10 +58,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/**
- * Optional guard for role-gated routes. Use after requireAuth:
- *   app.post('/api/admin/x', requireRole('admin'), handler)
- */
 export function requireRole(...allowed: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user || !allowed.includes(req.user.role)) {

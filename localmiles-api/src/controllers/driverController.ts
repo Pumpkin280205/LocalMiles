@@ -13,6 +13,7 @@ interface DriverFields {
   LicenceNumber: string;
   IsAvailable: boolean;
   IsActive: boolean;
+  Rating: number | null;
 }
 
 type ParseResult =
@@ -28,11 +29,6 @@ function reqStr(body: any, key: string): string | null {
   return typeof v === 'string' && v.trim() ? v.trim() : null;
 }
 
-/**
- * Validate writable Driver fields. On create, UserId/DepotId/EmployeeNumber/
- * PhoneNumber/LicenceNumber are required. On update, UserId is not writable
- * (it's the identity link) and everything else is optional.
- */
 function parseDriverInput(body: any, partial: boolean): ParseResult {
   const out: Partial<DriverFields> = {};
 
@@ -65,6 +61,13 @@ function parseDriverInput(body: any, partial: boolean): ParseResult {
       if (typeof body[key] !== 'boolean') return { ok: false, error: `${key} must be a boolean` };
       out[key] = body[key];
     }
+  }
+
+  if (has('Rating')) {
+    if (body.Rating !== null &&
+        (typeof body.Rating !== 'number' || !Number.isFinite(body.Rating) || body.Rating < 0 || body.Rating > 5))
+      return { ok: false, error: 'Rating must be a number between 0 and 5, or null' };
+    out.Rating = body.Rating;
   }
 
   return { ok: true, value: out };

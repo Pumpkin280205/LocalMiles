@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
-import { parseId, writeError, isIsoDate, driverIdForUser } from '../lib/db.js';
+import { parseId, writeError, isIsoDate, driverIdForUser, userCanAccessJob } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
+import { notifyDeliveryFailed } from '../lib/notifications.js';
 
 const TABLE = 'DeliveryStop';
 const PK = 'StopId';
@@ -11,6 +12,23 @@ export const STOP_STATUSES = ['Pending', 'Arrived', 'Completed', 'Failed', 'Canc
 
 //Statuses a driver (not admin) may set via the status endpoint. */
 const DRIVER_SETTABLE_STATUSES = ['Arrived', 'Completed', 'Failed'] as const;
+
+/**
+ * Valid next statuses for a stop, keyed by its current status. Completed and
+ * Cancelled are terminal. Failed can go back to Arrived/Pending to allow a retry.
+ */
+const STOP_TRANSITIONS: Record<string, readonly string[]> = {
+  Pending: ['Arrived', 'Cancelled'],
+  Arrived: ['Completed', 'Failed', 'Cancelled'],
+  Failed: ['Arrived', 'Pending', 'Cancelled'],
+  Completed: [],
+  Cancelled: [],
+};
+
+//A same-status call is always a no-op; anything else must be a listed transition. */
+export function isValidStopTransition(from: string, to: string): boolean {
+  return from === to || (STOP_TRANSITIONS[from]?.includes(to) ?? false);
+}
 
 interface StopFields {
   SequenceNumber: number;
@@ -24,17 +42,13 @@ interface StopFields {
   Instructions: string | null;
   ArrivedAt: string | null;
   CompletedAt: string | null;
+  FailureReason: string | null;
 }
 
 type ParseResult =
   | { ok: true; value: Partial<StopFields> }
   | { ok: false; error: string };
 
-/**
- * Validate writable DeliveryStop fields. JobId comes from the route, never the
- * body. On create, SequenceNumber/RecipientName/Address/Latitude/Longitude are
- * required.
- */
 function parseStopInput(body: any, partial: boolean): ParseResult {
   const out: Partial<StopFields> = {};
   const has = (k: string) => body != null && body[k] !== undefined;
@@ -87,23 +101,37 @@ function parseStopInput(body: any, partial: boolean): ParseResult {
     out.Instructions = body.Instructions;
   }
 
+  if (has('FailureReason')) {
+    if (body.FailureReason !== null && typeof body.FailureReason !== 'string')
+      return { ok: false, error: 'FailureReason must be a string or null' };
+    out.FailureReason = body.FailureReason;
+  }
+
   return { ok: true, value: out };
 }
 
-/** Fetch a stop plus its parent job's DriverId. */
-async function getStopWithDriver(stopId: number) {
+/** Fetch a stop plus its parent job's DriverId/ClientId/ReferenceNumber. */
+async function getStopWithJob(stopId: number) {
   const { data, error } = await supabase
     .from(TABLE)
-    .select('*, DeliveryJob(DriverId)')
+    .select('*, DeliveryJob(DriverId, ClientId, ReferenceNumber)')
     .eq(PK, stopId)
     .maybeSingle();
   return { data, error };
 }
 
-//GET /api/jobs/:jobId/stops — any authenticated user. */
+//GET /api/jobs/:jobId/stops — admin, or the job's own driver/client. */
 export async function listStopsForJob(req: Request, res: Response) {
   const jobId = parseId(req.params.jobId);
   if (jobId === null) return res.status(400).json({ error: 'Invalid job id' });
+
+  const { data: job, error: jobErr } = await supabase
+    .from('DeliveryJob')
+    .select('DriverId, ClientId')
+    .eq('JobId', jobId)
+    .maybeSingle();
+  if (jobErr) return writeError(res, jobErr, 'Database error');
+  if (!job || !(await userCanAccessJob(req, job))) return res.status(404).json({ error: 'Job not found' });
 
   const { data, error } = await supabase
     .from(TABLE)
@@ -114,15 +142,19 @@ export async function listStopsForJob(req: Request, res: Response) {
   return res.json({ stops: data });
 }
 
-//GET /api/stops/:id — any authenticated user. */
+//GET /api/stops/:id — admin, or the parent job's own driver/client. */
 export async function getStop(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid stop id' });
 
-  const { data, error } = await supabase.from(TABLE).select('*').eq(PK, id).maybeSingle();
+  const { data, error } = await getStopWithJob(id);
   if (error) return writeError(res, error, 'Database error');
-  if (!data) return res.status(404).json({ error: 'Stop not found' });
-  return res.json({ stop: data });
+  const job = (data as any)?.DeliveryJob;
+  if (!data || !job || !(await userCanAccessJob(req, job)))
+    return res.status(404).json({ error: 'Stop not found' });
+
+  const { DeliveryJob, ...stop } = data as any;
+  return res.json({ stop });
 }
 
 //POST /api/jobs/:jobId/stops — admin only. */
@@ -144,7 +176,6 @@ export async function createStop(req: Request, res: Response) {
   return res.status(201).json({ stop: data });
 }
 
-//PATCH /api/stops/:id — admin only. Edit planning fields (incl. Status / timestamps). */
 export async function updateStop(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid stop id' });
@@ -153,6 +184,15 @@ export async function updateStop(req: Request, res: Response) {
   if (!parsed.ok) return res.status(400).json({ error: parsed.error });
   if (Object.keys(parsed.value).length === 0)
     return res.status(400).json({ error: 'No valid fields to update' });
+
+  if (parsed.value.Status !== undefined) {
+    const { data: current, error: curErr } = await supabase
+      .from(TABLE).select('Status').eq(PK, id).maybeSingle();
+    if (curErr) return writeError(res, curErr, 'Database error');
+    if (!current) return res.status(404).json({ error: 'Stop not found' });
+    if (!isValidStopTransition(current.Status, parsed.value.Status))
+      return res.status(409).json({ error: `Cannot transition stop from ${current.Status} to ${parsed.value.Status}` });
+  }
 
   const { data, error } = await supabase
     .from(TABLE)
@@ -165,19 +205,18 @@ export async function updateStop(req: Request, res: Response) {
   return res.json({ stop: data });
 }
 
-/**
- * PATCH /api/stops/:id/status — the driver assigned to the parent job, or an admin.
- * Sets ArrivedAt/CompletedAt automatically on the matching transitions.
- */
 export async function updateStopStatus(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid stop id' });
 
-  const { Status } = req.body ?? {};
+  const { Status, FailureReason } = req.body ?? {};
   if (!STOP_STATUSES.includes(Status))
     return res.status(400).json({ error: `Status must be one of: ${STOP_STATUSES.join(', ')}` });
 
-  const { data: stop, error: getErr } = await getStopWithDriver(id);
+  if (Status === 'Failed' && (typeof FailureReason !== 'string' || !FailureReason.trim()))
+    return res.status(400).json({ error: 'FailureReason is required when Status is Failed' });
+
+  const { data: stop, error: getErr } = await getStopWithJob(id);
   if (getErr) return writeError(res, getErr, 'Database error');
   if (!stop) return res.status(404).json({ error: 'Stop not found' });
 
@@ -190,6 +229,9 @@ export async function updateStopStatus(req: Request, res: Response) {
       return res.status(403).json({ error: `Drivers may only set: ${DRIVER_SETTABLE_STATUSES.join(', ')}` });
   }
 
+  if (!isValidStopTransition((stop as any).Status, Status))
+    return res.status(409).json({ error: `Cannot transition stop from ${(stop as any).Status} to ${Status}` });
+
   const now = new Date().toISOString();
   const patch: Record<string, unknown> = { Status };
   if (Status === 'Arrived' && !(stop as any).ArrivedAt) patch.ArrivedAt = now;
@@ -197,6 +239,7 @@ export async function updateStopStatus(req: Request, res: Response) {
     if (!(stop as any).ArrivedAt) patch.ArrivedAt = now;
     patch.CompletedAt = now;
   }
+  if (Status === 'Failed') patch.FailureReason = (FailureReason as string).trim();
 
   const { data, error } = await supabase
     .from(TABLE)
@@ -205,6 +248,16 @@ export async function updateStopStatus(req: Request, res: Response) {
     .select()
     .maybeSingle();
   if (error) return writeError(res, error, 'Could not update stop status');
+
+  if (data && Status === 'Failed' && (stop as any).Status !== 'Failed') {
+    const job = (stop as any).DeliveryJob;
+    await notifyDeliveryFailed(
+      { JobId: (stop as any).JobId, ClientId: job.ClientId, DriverId: job.DriverId, ReferenceNumber: job.ReferenceNumber },
+      id,
+      (FailureReason as string).trim()
+    );
+  }
+
   return res.json({ stop: data });
 }
 
@@ -212,6 +265,13 @@ export async function updateStopStatus(req: Request, res: Response) {
 export async function cancelStop(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid stop id' });
+
+  const { data: current, error: curErr } = await supabase
+    .from(TABLE).select('Status').eq(PK, id).maybeSingle();
+  if (curErr) return writeError(res, curErr, 'Database error');
+  if (!current) return res.status(404).json({ error: 'Stop not found' });
+  if (!isValidStopTransition(current.Status, 'Cancelled'))
+    return res.status(409).json({ error: `Cannot cancel a stop with status ${current.Status}` });
 
   const { data, error } = await supabase
     .from(TABLE)

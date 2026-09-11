@@ -73,3 +73,4 @@ console.log(`CLIENT_ID=${client.ClientId}`);
 console.log(`DEPOT_ID=${depot.DepotId}`);
 console.log(`ADMIN_TOKEN=${sign(admin)}`);
 console.log(`DRIVER_TOKEN=${sign(driver)}`);
+console.log(`CLIENT_TOKEN=${sign(clientUser)}`);

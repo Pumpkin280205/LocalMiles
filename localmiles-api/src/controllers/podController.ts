@@ -1,14 +1,18 @@
 import type { Request, Response } from 'express';
 import multer from 'multer';
 import { supabase } from '../supabaseClient.js';
-import { parseId, writeError, posInt, isIsoDate, driverIdForUser } from '../lib/db.js';
+import { parseId, writeError, posInt, isIsoDate, driverIdForUser, userCanAccessJob } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
+import { haversineKm } from '../lib/geo.js';
 
 const TABLE = 'ProofOfDelivery';
 const PK = 'PodId';
 //Storage bucket. The brief specifies this exact (lower-case) name. */
 const BUCKET = 'pod-uploads';
 const SIGNED_URL_TTL = 3600; // seconds
+// How far a driver's submitted GPS position may be from the stop's own coordinates.
+// Generous enough for normal phone-GPS drift, tight enough to catch a wrong location.
+const MAX_POD_DISTANCE_METERS = 200;
 
 //multipart/form-data middleware: optional `photo` and `signature` image files. */
 export const podUpload = multer({
@@ -38,13 +42,6 @@ async function withSignedUrls(pod: any) {
   return out;
 }
 
-/**
- * POST /api/stops/:stopId/pod  (multipart/form-data)
- * Fields: RecipientName*, Latitude*, Longitude*, Notes?, CapturedAt? (ISO),
- *         DriverId? (required only when an admin submits on a driver's behalf).
- * Files:  photo?, signature?  (images, <=10MB each)
- * The assigned driver, or an admin, may submit. One POD per stop (unique StopId).
- */
 export async function submitPod(req: Request, res: Response) {
   const stopId = parseId(req.params.stopId);
   if (stopId === null) return res.status(400).json({ error: 'Invalid stop id' });
@@ -73,7 +70,7 @@ export async function submitPod(req: Request, res: Response) {
   // Look up the stop and the driver assigned to its parent job.
   const { data: stop, error: stopErr } = await supabase
     .from('DeliveryStop')
-    .select('StopId, DeliveryJob(DriverId)')
+    .select('StopId, Latitude, Longitude, DeliveryJob(DriverId)')
     .eq('StopId', stopId)
     .maybeSingle();
   if (stopErr) return writeError(res, stopErr, 'Database error');
@@ -90,6 +87,19 @@ export async function submitPod(req: Request, res: Response) {
     const jobDriverId = (stop as any).DeliveryJob?.DriverId ?? null;
     if (driverId === null || jobDriverId !== driverId)
       return res.status(403).json({ error: 'Not your delivery' });
+
+    // GPS-proximity check: only enforced for the driver's own submission, not
+    // an admin's back-office override (an admin isn't physically at the stop).
+    const distanceMeters =
+      haversineKm(
+        { lat: (stop as any).Latitude, lng: (stop as any).Longitude },
+        { lat: Latitude, lng: Longitude }
+      ) * 1000;
+    if (distanceMeters > MAX_POD_DISTANCE_METERS) {
+      return res.status(400).json({
+        error: `Submitted location is ${Math.round(distanceMeters)}m from the stop (max ${MAX_POD_DISTANCE_METERS}m)`,
+      });
+    }
   }
 
   const files = req.files as Record<string, Express.Multer.File[]> | undefined;
@@ -135,14 +145,12 @@ export async function submitPod(req: Request, res: Response) {
 
   const { data, error } = await supabase.from(TABLE).insert(row).select().single();
   if (error) {
-    // Roll back the just-uploaded files so a retry isn't blocked by orphans.
     const paths = [PhotoUrl, SignatureUrl].filter(Boolean) as string[];
     if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
     return writeError(res, error, 'Could not save proof of delivery');
   }
 
-  // Best-effort: a POD means the stop is delivered. Remove this block if you'd
-  // rather the client call PATCH /api/stops/:id/status itself.
+  // Best-effort: a POD means the stop is delivered. 
   await supabase
     .from('DeliveryStop')
     .update({ Status: 'Completed', CompletedAt: new Date().toISOString() })
@@ -151,10 +159,20 @@ export async function submitPod(req: Request, res: Response) {
   return res.status(201).json({ pod: await withSignedUrls(data) });
 }
 
-//GET /api/stops/:stopId/pod — any authenticated user. */
+//GET /api/stops/:stopId/pod — admin, or the stop's parent job's own driver/client. */
 export async function getPodForStop(req: Request, res: Response) {
   const stopId = parseId(req.params.stopId);
   if (stopId === null) return res.status(400).json({ error: 'Invalid stop id' });
+
+  const { data: stop, error: stopErr } = await supabase
+    .from('DeliveryStop')
+    .select('DeliveryJob(DriverId, ClientId)')
+    .eq('StopId', stopId)
+    .maybeSingle();
+  if (stopErr) return writeError(res, stopErr, 'Database error');
+  const job = (stop as any)?.DeliveryJob;
+  if (!stop || !job || !(await userCanAccessJob(req, job)))
+    return res.status(404).json({ error: 'No proof of delivery for this stop' });
 
   const { data, error } = await supabase.from(TABLE).select('*').eq('StopId', stopId).maybeSingle();
   if (error) return writeError(res, error, 'Database error');
@@ -162,7 +180,7 @@ export async function getPodForStop(req: Request, res: Response) {
   return res.json({ pod: await withSignedUrls(data) });
 }
 
-//GET /api/pod/:id — any authenticated user. */
+//GET /api/pod/:id — admin, or the POD's stop's parent job's own driver/client. */
 export async function getPod(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid pod id' });
@@ -170,13 +188,32 @@ export async function getPod(req: Request, res: Response) {
   const { data, error } = await supabase.from(TABLE).select('*').eq(PK, id).maybeSingle();
   if (error) return writeError(res, error, 'Database error');
   if (!data) return res.status(404).json({ error: 'Proof of delivery not found' });
+
+  const { data: stop, error: stopErr } = await supabase
+    .from('DeliveryStop')
+    .select('DeliveryJob(DriverId, ClientId)')
+    .eq('StopId', data.StopId)
+    .maybeSingle();
+  if (stopErr) return writeError(res, stopErr, 'Database error');
+  const job = (stop as any)?.DeliveryJob;
+  if (!stop || !job || !(await userCanAccessJob(req, job)))
+    return res.status(404).json({ error: 'Proof of delivery not found' });
+
   return res.json({ pod: await withSignedUrls(data) });
 }
 
-//GET /api/jobs/:jobId/pods — any authenticated user. All PODs for a job's stops. */
+//GET /api/jobs/:jobId/pods — admin, or the job's own driver/client. All PODs for a job's stops. */
 export async function listPodsForJob(req: Request, res: Response) {
   const jobId = parseId(req.params.jobId);
   if (jobId === null) return res.status(400).json({ error: 'Invalid job id' });
+
+  const { data: job, error: jobErr } = await supabase
+    .from('DeliveryJob')
+    .select('DriverId, ClientId')
+    .eq('JobId', jobId)
+    .maybeSingle();
+  if (jobErr) return writeError(res, jobErr, 'Database error');
+  if (!job || !(await userCanAccessJob(req, job))) return res.status(404).json({ error: 'Job not found' });
 
   const { data, error } = await supabase
     .from(TABLE)

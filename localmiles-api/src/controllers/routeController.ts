@@ -2,33 +2,10 @@ import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
 import { parseId, writeError, driverIdForUser } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
+import { haversineKm, type Point } from '../lib/geo.js';
 
-const EARTH_RADIUS_KM = 6371;
 // Rough urban delivery-van average, used only to turn distance into an ETA estimate.
 const AVERAGE_SPEED_KMH = 35;
-
-interface Point {
-  lat: number;
-  lng: number;
-}
-
-function toRad(deg: number): number {
-  return (deg * Math.PI) / 180;
-}
-
-//Great-circle ("as the crow flies") distance between two lat/lng points, in km.
-function haversineKm(a: Point, b: Point): number {
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
-}
 
 function nearestNeighbourOrder<T extends Point>(
   start: Point,
@@ -60,12 +37,6 @@ function nearestNeighbourOrder<T extends Point>(
   return { order, totalKm };
 }
 
-/**
- * GET /api/jobs/:id/route — the job's assigned driver, or an admin.
- * Computes an ordered stop sequence fresh on every call (nothing is persisted)
- * using nearest-neighbour from the job's depot. Only Pending/Arrived stops are
- * routed — Completed/Failed/Cancelled stops have nothing left to visit.
- */
 export async function getJobRoute(req: Request, res: Response) {
   const jobId = parseId(req.params.id);
   if (jobId === null) return res.status(400).json({ error: 'Invalid job id' });
