@@ -1,15 +1,7 @@
 import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
-import { parseId, writeError, posInt, isIsoDate, driverIdForUser, clientIdForUser, userCanAccessJob } from '../lib/db.js';
+import { parseId, writeError, posInt, isIsoDate, driverIdForUser } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
-import { notifyJobAssigned, notifyJobCompleted } from '../lib/notifications.js';
-
-//Fire the notification (if any) for an actual Status change. No-op if the status didn't change. */
-async function notifyJobStatusChange(previousStatus: string, job: { JobId: number; ClientId: number; DriverId: number | null; ReferenceNumber: string | null }, newStatus: string) {
-  if (newStatus === previousStatus) return;
-  if (newStatus === 'Assigned') await notifyJobAssigned(job);
-  else if (newStatus === 'Completed') await notifyJobCompleted(job);
-}
 
 const TABLE = 'DeliveryJob';
 const PK = 'JobId';
@@ -23,23 +15,6 @@ export const JOB_PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'] as const;
 
 // Statuses a driver (not admin) is allowed to move their own job into. */
 const DRIVER_SETTABLE_STATUSES = ['EnRoute', 'Completed'] as const;
-
-/**
- * Valid next statuses for a job, keyed by its current status. Completed and
- * Cancelled are terminal. Assigned can revert to Pending (unassignment).
- */
-const JOB_TRANSITIONS: Record<string, readonly string[]> = {
-  Pending: ['Assigned', 'Cancelled'],
-  Assigned: ['EnRoute', 'Pending', 'Cancelled'],
-  EnRoute: ['Completed', 'Cancelled'],
-  Completed: [],
-  Cancelled: [],
-};
-
-//A same-status call is always a no-op; anything else must be a listed transition. */
-export function isValidJobTransition(from: string, to: string): boolean {
-  return from === to || (JOB_TRANSITIONS[from]?.includes(to) ?? false);
-}
 
 interface JobFields {
   ClientId: number;
@@ -57,12 +32,7 @@ interface JobFields {
 type ParseResult =
   | { ok: true; value: Partial<JobFields> }
   | { ok: false; error: string };
-
-/**
- * Validate writable DeliveryJob fields. ClientId/DepotId/ScheduledDate are
- * required on create. CreatedByUserId and CreatedAt are set by the server,
- * never from the body, and cannot be changed.
- */
+  
 function parseJobInput(body: any, partial: boolean): ParseResult {
   const out: Partial<JobFields> = {};
   const has = (k: string) => body != null && body[k] !== undefined;
@@ -87,7 +57,6 @@ function parseJobInput(body: any, partial: boolean): ParseResult {
     out.ScheduledDate = new Date(body.ScheduledDate).toISOString();
   } else if (!partial) return { ok: false, error: 'ScheduledDate is required' };
 
-  //Nullable FKs: accept a positive int or an explicit null (to unassign).
   for (const k of ['DriverId', 'VehicleId'] as const) {
     if (has(k)) {
       if (body[k] !== null && !posInt(body[k]))
@@ -131,15 +100,6 @@ function parseJobInput(body: any, partial: boolean): ParseResult {
   return { ok: true, value: out };
 }
 
-/**
- * GET /api/jobs
- * Filters: status, priority, clientId, driverId, vehicleId, depotId,
- *          scheduledFrom, scheduledTo (ISO), limit (<=200, default 50), offset.
- * RBAC read-scoping: admins see everything the filters above allow; a driver
- * always sees only jobs assigned to them, a client always sees only their own
- * jobs, regardless of any clientId/driverId filter passed — those filters can
- * only narrow within the caller's own scope, never widen it.
- */
 export async function listJobs(req: Request, res: Response) {
   const q = req.query;
   let query = supabase.from(TABLE).select('*').order('ScheduledDate', { ascending: true });
@@ -179,14 +139,10 @@ export async function listJobs(req: Request, res: Response) {
     query = query.lte('ScheduledDate', new Date(q.scheduledTo as string).toISOString());
   }
 
-  if (req.user!.role === ROLE.DRIVER) {
+  if (q.mine === 'true') {
     const driverId = await driverIdForUser(Number(req.user!.id));
     if (driverId === null) return res.json({ jobs: [] });
     query = query.eq('DriverId', driverId);
-  } else if (req.user!.role === ROLE.CLIENT) {
-    const clientId = await clientIdForUser(Number(req.user!.id));
-    if (clientId === null) return res.json({ jobs: [] });
-    query = query.eq('ClientId', clientId);
   }
 
   const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
@@ -198,22 +154,17 @@ export async function listJobs(req: Request, res: Response) {
   return res.json({ jobs: data, limit, offset });
 }
 
-//GET /api/jobs/:id — admin, or the job's own driver/client. */
+//GET /api/jobs/:id — any authenticated user. */
 export async function getJob(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid job id' });
 
   const { data, error } = await supabase.from(TABLE).select('*').eq(PK, id).maybeSingle();
   if (error) return writeError(res, error, 'Database error');
-  if (!data || !(await userCanAccessJob(req, data))) return res.status(404).json({ error: 'Job not found' });
+  if (!data) return res.status(404).json({ error: 'Job not found' });
   return res.json({ job: data });
 }
 
-/**
- * POST /api/jobs — admin only. ReferenceNumber is assigned after insert (it's
- * derived from the JobId Postgres generates, e.g. LM-000042) so it can't be
- * set or collided with by the caller.
- */
 export async function createJob(req: Request, res: Response) {
   const parsed = parseJobInput(req.body, false);
   if (!parsed.ok) return res.status(400).json({ error: parsed.error });
@@ -241,10 +192,7 @@ export async function createJob(req: Request, res: Response) {
   return res.status(201).json({ job: data });
 }
 
-/**
- * PATCH /api/jobs/:id — admin only. Full update incl. driver/vehicle assignment.
- * If Status is included, it must be a valid transition from the job's current status.
- */
+//PATCH /api/jobs/:id — admin only. Full update incl. driver/vehicle assignment. */
 export async function updateJob(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid job id' });
@@ -254,17 +202,6 @@ export async function updateJob(req: Request, res: Response) {
   if (Object.keys(parsed.value).length === 0)
     return res.status(400).json({ error: 'No valid fields to update' });
 
-  let previousStatus: string | undefined;
-  if (parsed.value.Status !== undefined) {
-    const { data: current, error: curErr } = await supabase
-      .from(TABLE).select('Status').eq(PK, id).maybeSingle();
-    if (curErr) return writeError(res, curErr, 'Database error');
-    if (!current) return res.status(404).json({ error: 'Job not found' });
-    if (!isValidJobTransition(current.Status, parsed.value.Status))
-      return res.status(409).json({ error: `Cannot transition job from ${current.Status} to ${parsed.value.Status}` });
-    previousStatus = current.Status;
-  }
-
   const { data, error } = await supabase
     .from(TABLE)
     .update(parsed.value)
@@ -273,15 +210,9 @@ export async function updateJob(req: Request, res: Response) {
     .maybeSingle();
   if (error) return writeError(res, error, 'Could not update job');
   if (!data) return res.status(404).json({ error: 'Job not found' });
-  if (previousStatus !== undefined) await notifyJobStatusChange(previousStatus, data, data.Status);
   return res.json({ job: data });
 }
 
-/**
- * PATCH /api/jobs/:id/status — driver or admin.
- * A driver may only change the status of a job assigned to them, and only to
- * one of DRIVER_SETTABLE_STATUSES. An admin may set any valid status.
- */
 export async function updateJobStatus(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid job id' });
@@ -291,7 +222,7 @@ export async function updateJobStatus(req: Request, res: Response) {
     return res.status(400).json({ error: `Status must be one of: ${JOB_STATUSES.join(', ')}` });
 
   const { data: job, error: getErr } = await supabase
-    .from(TABLE).select('JobId, DriverId, Status').eq(PK, id).maybeSingle();
+    .from(TABLE).select('JobId, DriverId').eq(PK, id).maybeSingle();
   if (getErr) return writeError(res, getErr, 'Database error');
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
@@ -303,13 +234,9 @@ export async function updateJobStatus(req: Request, res: Response) {
       return res.status(403).json({ error: `Drivers may only set: ${DRIVER_SETTABLE_STATUSES.join(', ')}` });
   }
 
-  if (!isValidJobTransition(job.Status, Status))
-    return res.status(409).json({ error: `Cannot transition job from ${job.Status} to ${Status}` });
-
   const { data, error } = await supabase
     .from(TABLE).update({ Status }).eq(PK, id).select().maybeSingle();
   if (error) return writeError(res, error, 'Could not update job status');
-  if (data) await notifyJobStatusChange(job.Status, data, data.Status);
   return res.json({ job: data });
 }
 
@@ -317,13 +244,6 @@ export async function updateJobStatus(req: Request, res: Response) {
 export async function cancelJob(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid job id' });
-
-  const { data: current, error: curErr } = await supabase
-    .from(TABLE).select('Status').eq(PK, id).maybeSingle();
-  if (curErr) return writeError(res, curErr, 'Database error');
-  if (!current) return res.status(404).json({ error: 'Job not found' });
-  if (!isValidJobTransition(current.Status, 'Cancelled'))
-    return res.status(409).json({ error: `Cannot cancel a job with status ${current.Status}` });
 
   const { data, error } = await supabase
     .from(TABLE)
