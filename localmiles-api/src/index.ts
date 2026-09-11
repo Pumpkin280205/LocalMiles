@@ -41,6 +41,7 @@ import {
   updateStopStatus,
   cancelStop,
 } from './controllers/stopController.js';
+import { getJobRoute } from './controllers/routeController.js';
 import {
   podUpload,
   submitPod,
@@ -107,6 +108,10 @@ app.post('/api/jobs', requireRole(ROLE.ADMIN), createJob);
 app.patch('/api/jobs/:id', requireRole(ROLE.ADMIN), updateJob);
 app.patch('/api/jobs/:id/status', updateJobStatus);
 app.delete('/api/jobs/:id', requireRole(ROLE.ADMIN), cancelJob);
+
+// Route optimisation: read-only, computed fresh each call (nothing persisted).
+// Assigned driver or admin only.
+app.get('/api/jobs/:id/route', getJobRoute);
 
 // Delivery stops: nested under a job for list/create; flat for item ops.
 // Read = any auth; plan/edit/cancel = admin; status updates = assigned driver or admin.

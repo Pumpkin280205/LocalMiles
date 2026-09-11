@@ -1,20 +1,14 @@
 import type { Request, Response } from 'express';
-import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { supabase } from '../supabaseClient.js';
+import { verifyIdToken } from '../lib/verifyIdToken.js';
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-if (!GOOGLE_CLIENT_ID) {
-  throw new Error('GOOGLE_CLIENT_ID is not set in the environment');
-}
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not set in the environment');
 }
 
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
-
-// Role a brand-new self-registered Google user is given.
+// Role a brand-new self-registered user is given.
 const DEFAULT_ROLE = 'driver';
 
 export async function loginHandler(req: Request, res: Response) {
@@ -24,21 +18,9 @@ export async function loginHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Missing idToken in request body' });
     }
 
-    // 1. Verify the Google ID token is genuine and issued for our client.
-    const ticket = await googleClient.verifyIdToken({
-      idToken,
-      audience: GOOGLE_CLIENT_ID!, // guaranteed non-null by the check above
-    });
-
-    // 2. Pull the identity out of the verified payload.
-    const payload = ticket.getPayload();
-    if (!payload?.email || !payload.sub) {
-      return res.status(401).json({ error: 'Google token is missing email or sub' });
-    }
-    const email = payload.email;
-    const ssoProviderId = payload.sub;
-    const firstName = payload.given_name ?? payload.name ?? '';
-    const lastName = payload.family_name ?? '';
+    // 1. Verify the ID token (Firebase and/or Google)
+    //    and normalise it to a common identity shape.
+    const { email, ssoProviderId, firstName, lastName } = await verifyIdToken(idToken);
 
     // 3. Look for an existing User row with this email.
     const { data: existingUser, error: selectError } = await supabase
@@ -55,7 +37,6 @@ export async function loginHandler(req: Request, res: Response) {
     let user = existingUser;
 
     if (user) {
-      // Best-effort: record the login time. Don't fail the request if it errors.
       await supabase
         .from('User')
         .update({ LastLoginAt: new Date().toISOString() })
