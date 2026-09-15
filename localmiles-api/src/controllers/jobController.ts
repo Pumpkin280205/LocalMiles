@@ -16,6 +16,23 @@ export const JOB_PRIORITIES = ['Low', 'Normal', 'High', 'Urgent'] as const;
 // Statuses a driver (not admin) is allowed to move their own job into. */
 const DRIVER_SETTABLE_STATUSES = ['EnRoute', 'Completed'] as const;
 
+/**
+ * Valid next statuses for a job, keyed by its current status. Completed and
+ * Cancelled are terminal.
+ */
+const JOB_TRANSITIONS: Record<string, readonly string[]> = {
+  Pending: ['Assigned', 'Cancelled'],
+  Assigned: ['EnRoute', 'Pending', 'Cancelled'],
+  EnRoute: ['Completed', 'Cancelled'],
+  Completed: [],
+  Cancelled: [],
+};
+
+//A same-status call is always a no-op; anything else must be a listed transition. */
+export function isValidJobTransition(from: string, to: string): boolean {
+  return from === to || (JOB_TRANSITIONS[from]?.includes(to) ?? false);
+}
+
 interface JobFields {
   ClientId: number;
   DriverId: number | null;
@@ -222,7 +239,7 @@ export async function updateJobStatus(req: Request, res: Response) {
     return res.status(400).json({ error: `Status must be one of: ${JOB_STATUSES.join(', ')}` });
 
   const { data: job, error: getErr } = await supabase
-    .from(TABLE).select('JobId, DriverId').eq(PK, id).maybeSingle();
+    .from(TABLE).select('JobId, DriverId, Status').eq(PK, id).maybeSingle();
   if (getErr) return writeError(res, getErr, 'Database error');
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
@@ -233,6 +250,9 @@ export async function updateJobStatus(req: Request, res: Response) {
     if (!DRIVER_SETTABLE_STATUSES.includes(Status))
       return res.status(403).json({ error: `Drivers may only set: ${DRIVER_SETTABLE_STATUSES.join(', ')}` });
   }
+
+  if (!isValidJobTransition(job.Status, Status))
+    return res.status(409).json({ error: `Cannot transition job from ${job.Status} to ${Status}` });
 
   const { data, error } = await supabase
     .from(TABLE).update({ Status }).eq(PK, id).select().maybeSingle();
