@@ -7,6 +7,7 @@ import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Network.RetrofitClient
 import com.example.localmiles.Core.Utils.Result
 import com.example.localmiles.Core.Utils.SessionManager
+import com.example.localmiles.Core.Network.Dto.StopResponse
 
 class JobRepository(
     session: SessionManager,
@@ -36,6 +37,13 @@ class JobRepository(
     //GET jobs/{id}.
     suspend fun getJob(id: Long): Result<JobResponse> =
         apiCall { api.getJob(id).job }
+
+    // Retrieves the delivery stops for a jobn
+// Used by client tracking to display the shipment's delivery progress
+    suspend fun getStopsForJob(jobId: Long): Result<List<StopResponse>> =
+        apiCall {
+            api.getStopsForJob(jobId).stops
+        }
 
     // POST jobs — admin only.
     suspend fun createJob(body: JobUpsertRequest): Result<JobResponse> =

@@ -9,12 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.localmiles.Core.Network.Dto.StopResponse
 
 // Represents all the information needed by the client screens
 data class ClientDashboardUiState(
     val isLoading: Boolean = false,
     val jobs: List<JobResponse> = emptyList(),
     val selectedJob: JobResponse? = null,
+    val stops: List<StopResponse> = emptyList(),
     val errorMessage: String? = null
 )
 
@@ -84,6 +86,54 @@ class ClientViewModel(
         }
     }
 
+    // Loads the selected delivery together with its stops for the client shipment-tracking screen
+    fun loadShipmentTracking(jobId: Long) {
+        viewModelScope.launch {
+
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null,
+                stops = emptyList()
+            )
+
+            // First retrieve the selected delivery.
+            when (val jobResult = jobRepository.getJob(jobId)) {
+
+                is Result.Success -> {
+
+                    // Once the job is available, retrieve its delivery stops.
+                    when (val stopsResult = jobRepository.getStopsForJob(jobId)) {
+
+                        is Result.Success -> {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                selectedJob = jobResult.data,
+                                stops = stopsResult.data.sortedBy {
+                                    it.sequenceNumber
+                                },
+                                errorMessage = null
+                            )
+                        }
+
+                        is Result.Error -> {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                selectedJob = jobResult.data,
+                                errorMessage = stopsResult.message
+                            )
+                        }
+                    }
+                }
+
+                is Result.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = jobResult.message
+                    )
+                }
+            }
+        }
+    }
     fun clearError() {
         _uiState.value = _uiState.value.copy(
             errorMessage = null
