@@ -50,17 +50,19 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
         composable(Routes.DISPATCHER_DASHBOARD) { PlaceholderDashboard("Dispatcher (admin)", nav) }
         composable(Routes.DRIVER_DASHBOARD) { PlaceholderDashboard("Driver", nav) }
 
-        // Client dashboard and client-specific navigation
         composable(Routes.CLIENT_DASHBOARD) {
 
             val context = LocalContext.current
 
-
+            // ViewModel used to load deliveries belonging to the logged-in client
             val clientViewModel = ClientViewModel(
                 jobRepository = JobRepository(
                     session = SessionManager(context)
                 )
             )
+
+            // Existing authentication ViewModel handles logout and clears the session
+            val authViewModel: AuthViewModel = viewModel()
 
             ClientDashboardScreen(
                 viewModel = clientViewModel,
@@ -75,6 +77,21 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
                 // Open the client's settings
                 onOpenSettings = {
                     nav.navigate(Routes.CLIENT_SETTINGS)
+                },
+
+                // Clear the authenticated session and return to the login screen
+                onLogout = {
+                    authViewModel.logout()
+
+                    nav.navigate(Routes.LOGIN) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
 
                     // Displays tracking information for the delivery selected from the client dashboard.
                     composable( route = Routes.CLIENT_TRACK_SHIPMENT,
@@ -112,12 +129,9 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
                         )
                     }
                 }
-
-
-            )
         }
-    }
-}
+
+
 
 
 

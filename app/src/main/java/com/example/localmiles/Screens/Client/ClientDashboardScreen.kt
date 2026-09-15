@@ -32,7 +32,8 @@ import androidx.compose.ui.tooling.preview.Preview
 fun ClientDashboardScreen(
     viewModel: ClientViewModel,
     onTrackShipment: (Long) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -66,8 +67,17 @@ fun ClientDashboardScreen(
                 )
             }
 
-            TextButton(onClick = onOpenSettings) {
-                Text("Settings")
+            // Client account actions
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                TextButton(onClick = onOpenSettings) {
+                    Text("Settings")
+                }
+
+                TextButton(onClick = onLogout) {
+                    Text("Log out")
+                }
             }
         }
 
