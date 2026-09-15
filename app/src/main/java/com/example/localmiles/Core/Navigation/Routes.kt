@@ -9,6 +9,13 @@ object Routes {
     const val DISPATCHER_DASHBOARD = "dispatcher/dashboard"
     const val DRIVER_DASHBOARD = "driver/dashboard"
     const val CLIENT_DASHBOARD = "client/dashboard"
+
+    // Client-specific navigation routes
+    const val CLIENT_TRACK_SHIPMENT = "client/track/{jobId}"
+    const val CLIENT_SETTINGS = "client/settings"
+
+    // Builds the tracking route with the selected delivery job ID
+    fun clientTrackShipment(jobId: Long): String = "client/track/$jobId"
 }
 
 /** Single source of truth for which home screen a role lands on after login. */
