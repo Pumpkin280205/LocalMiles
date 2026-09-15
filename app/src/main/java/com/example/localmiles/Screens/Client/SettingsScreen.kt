@@ -1,5 +1,6 @@
 package com.example.localmiles.Screens.Client
 
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -22,20 +22,46 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 // Settings available to LocalMiles clients.
-// These options allow the user to customise basic app behaviour.
+
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit
 ) {
-    // Settings are kept as local UI state for the current implementation.
-    // Persistent preferences can be connected later when required.
-    var selectedLanguage by remember { mutableStateOf("English") }
-    var notificationsEnabled by remember { mutableStateOf(true) }
-    var dataSaverEnabled by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // Store client settings locally on the device.
+    val preferences = remember {
+        context.getSharedPreferences(
+            "localmiles_client_settings",
+            Context.MODE_PRIVATE
+        )
+    }
+
+    // Load the previously selected language
+    var selectedLanguage by remember {
+        mutableStateOf(
+            preferences.getString("language", "English") ?: "English"
+        )
+    }
+
+    // Load the previously selected notification preference.
+    var notificationsEnabled by remember {
+        mutableStateOf(
+            preferences.getBoolean("notifications_enabled", true)
+        )
+    }
+
+    // Load the previously selected data saver preference.
+    var dataSaverEnabled by remember {
+        mutableStateOf(
+            preferences.getBoolean("data_saver_enabled", false)
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -63,10 +89,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ---------------------------------------------------------
         // Language setting
-        // ---------------------------------------------------------
-
         Text(
             text = "Language",
             style = MaterialTheme.typography.titleMedium,
@@ -92,6 +115,10 @@ fun SettingsScreen(
                     selectedLanguage = selectedLanguage,
                     onSelected = {
                         selectedLanguage = "English"
+
+                        preferences.edit()
+                            .putString("language", "English")
+                            .apply()
                     }
                 )
 
@@ -100,6 +127,10 @@ fun SettingsScreen(
                     selectedLanguage = selectedLanguage,
                     onSelected = {
                         selectedLanguage = "isiZulu"
+
+                        preferences.edit()
+                            .putString("language", "isiZulu")
+                            .apply()
                     }
                 )
             }
@@ -107,10 +138,8 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ---------------------------------------------------------
-        // Notification setting
-        // ---------------------------------------------------------
 
+        // Notification setting
         Text(
             text = "Notifications",
             style = MaterialTheme.typography.titleMedium,
@@ -126,18 +155,21 @@ fun SettingsScreen(
                 title = "Delivery notifications",
                 description = "Receive shipment status and delivery updates.",
                 checked = notificationsEnabled,
-                onCheckedChange = {
-                    notificationsEnabled = it
+                onCheckedChange = { enabled ->
+
+                    notificationsEnabled = enabled
+
+                    preferences.edit()
+                        .putBoolean("notifications_enabled", enabled)
+                        .apply()
                 }
             )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // ---------------------------------------------------------
-        // Data saver setting
-        // ---------------------------------------------------------
 
+        // Data saver setting
         Text(
             text = "Data Usage",
             style = MaterialTheme.typography.titleMedium,
@@ -153,15 +185,20 @@ fun SettingsScreen(
                 title = "Data Saver",
                 description = "Reduce background data usage on limited connections.",
                 checked = dataSaverEnabled,
-                onCheckedChange = {
-                    dataSaverEnabled = it
+                onCheckedChange = { enabled ->
+
+                    dataSaverEnabled = enabled
+
+                    preferences.edit()
+                        .putBoolean("data_saver_enabled", enabled)
+                        .apply()
                 }
             )
         }
     }
 }
 
-// Displays one selectable language option.
+// Displays one selectable language optionn
 @Composable
 private fun LanguageOption(
     language: String,
@@ -172,6 +209,7 @@ private fun LanguageOption(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
+
         RadioButton(
             selected = selectedLanguage == language,
             onClick = onSelected
@@ -184,7 +222,7 @@ private fun LanguageOption(
     }
 }
 
-// Reusable row used for settings that can be switched on or off.
+
 @Composable
 private fun SettingSwitchRow(
     title: String,
@@ -203,6 +241,7 @@ private fun SettingSwitchRow(
         Column(
             modifier = Modifier.weight(1f)
         ) {
+
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
