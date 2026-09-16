@@ -29,27 +29,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Google/Firebase Web client ID used as serverClientId for Credential Manager.
+        // Set GOOGLE_WEB_CLIENT_ID in local.properties (see Firebase console -> Auth -> Google -> Web SDK config).
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
             "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"",
         )
-
-        buildConfigField(
-            "String",
-            "API_BASE_URL",
-            "\"${localProps.getProperty("API_BASE_URL") ?: "http://10.0.2.2:3000/api/"}\"",
-        )
-    }
-
-    signingConfigs {
-        getByName("debug") {
-
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
     }
 
     buildTypes {
