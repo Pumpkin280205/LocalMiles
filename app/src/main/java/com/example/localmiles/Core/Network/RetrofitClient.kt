@@ -11,7 +11,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "http://10.117.234.90:3000/api/"
+    private val BASE_URL = BuildConfig.API_BASE_URL
 
     @Volatile
     private var apiService: ApiService? = null
