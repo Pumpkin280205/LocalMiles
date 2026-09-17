@@ -93,45 +93,48 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
             )
         }
 
-                    // Displays tracking information for the delivery selected from the client dashboard.
-                    composable( route = Routes.CLIENT_TRACK_SHIPMENT,
-                        arguments = listOf(
-                            navArgument("jobId") {
-                                type = NavType.LongType
-                            }
-                        )
-                    ) { backStackEntry ->
-
-                        val context = LocalContext.current
-                        val jobId = backStackEntry.arguments?.getLong("jobId") ?: return@composable
-
-                        val clientViewModel = ClientViewModel(
-                            jobRepository = JobRepository(
-                                session = SessionManager(context)
-                            )
-                        )
-
-                        TrackShipmentScreen(
-                            jobId = jobId,
-                            viewModel = clientViewModel,
-                            onBack = {
-                                nav.popBackStack()
-
-                                // Client preferences screen.
-                                composable(Routes.CLIENT_SETTINGS) {
-                                    SettingsScreen(
-                                        onBack = {
-                                            nav.popBackStack()
-                                        }
-                                    )
-                                }
-                            }
-                        )
-                    }
+        // Displays tracking information for the delivery selected
+        // from the client dashboard.
+        composable(
+            route = Routes.CLIENT_TRACK_SHIPMENT,
+            arguments = listOf(
+                navArgument("jobId") {
+                    type = NavType.LongType
                 }
+            )
+        ) { backStackEntry ->
+
+            val context = LocalContext.current
+
+            val jobId =
+                backStackEntry.arguments?.getLong("jobId")
+                    ?: return@composable
+
+            val clientViewModel = ClientViewModel(
+                jobRepository = JobRepository(
+                    session = SessionManager(context)
+                )
+            )
+
+            TrackShipmentScreen(
+                jobId = jobId,
+                viewModel = clientViewModel,
+                onBack = {
+                    nav.popBackStack()
+                }
+            )
         }
 
-
+        // Client preferences screen.
+        composable(Routes.CLIENT_SETTINGS) {
+            SettingsScreen(
+                onBack = {
+                    nav.popBackStack()
+                }
+            )
+        }
+    }
+}
 
 
 

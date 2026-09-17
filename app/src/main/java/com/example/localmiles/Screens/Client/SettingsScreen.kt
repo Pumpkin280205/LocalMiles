@@ -25,6 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.statusBarsPadding
 
 // Settings available to LocalMiles clients.
 
@@ -66,14 +68,16 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .padding(16.dp)
     ) {
 
         // Return to the client dashboard.
-        TextButton(
-            onClick = onBack
+        Button(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Back")
+            Text("Back to Dashboard")
         }
 
         Text(

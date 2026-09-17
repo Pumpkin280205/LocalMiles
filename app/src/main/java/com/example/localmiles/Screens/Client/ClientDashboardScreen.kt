@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -23,9 +24,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.localmiles.Core.Network.JobResponse
-import androidx.compose.ui.tooling.preview.Preview
 
 // Main dashboard displayed after a client successfully logs in
 @Composable
@@ -45,16 +46,20 @@ fun ClientDashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .padding(16.dp)
     ) {
 
-        // Dashboard heading and settings navigation
+        // Dashboard heading and client account actions
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = "My Deliveries",
                     style = MaterialTheme.typography.headlineMedium,
@@ -71,11 +76,15 @@ fun ClientDashboardScreen(
             Column(
                 horizontalAlignment = Alignment.End
             ) {
-                TextButton(onClick = onOpenSettings) {
+                TextButton(
+                    onClick = onOpenSettings
+                ) {
                     Text("Settings")
                 }
 
-                TextButton(onClick = onLogout) {
+                TextButton(
+                    onClick = onLogout
+                ) {
                     Text("Log out")
                 }
             }
@@ -84,6 +93,7 @@ fun ClientDashboardScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         when {
+
             // Shows a progress indicator while jobs are being requested
             uiState.isLoading -> {
                 CircularProgressIndicator(
@@ -91,7 +101,7 @@ fun ClientDashboardScreen(
                 )
             }
 
-            // Shows an error message and allow the client to retry
+            // Shows an error message and allows the client to retry
             uiState.errorMessage != null -> {
                 Text(
                     text = uiState.errorMessage ?: "Unable to load deliveries.",
@@ -101,13 +111,15 @@ fun ClientDashboardScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Button(
-                    onClick = { viewModel.loadClientJobs() }
+                    onClick = {
+                        viewModel.loadClientJobs()
+                    }
                 ) {
                     Text("Try Again")
                 }
             }
 
-            // Provide a useful empty state when the client has no deliveries
+            // Empty state when the client has no deliveries
             uiState.jobs.isEmpty() -> {
                 Text(
                     text = "No deliveries found.",
@@ -122,7 +134,7 @@ fun ClientDashboardScreen(
                 )
             }
 
-            // Display all deliveries returned for the authenticated client.
+            // Display deliveries returned for the authenticated client
             else -> {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -154,6 +166,7 @@ private fun ClientDeliveryCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
+
             Text(
                 text = "Delivery #${job.jobId}",
                 style = MaterialTheme.typography.titleMedium,
@@ -200,13 +213,11 @@ private fun ClientDeliveryCard(
             ) {
                 Text("Track Shipment")
             }
-
-
         }
     }
 }
 
-// Preview used only during development to check the appearance
+// Preview used only during development
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun ClientDeliveryCardPreview() {
