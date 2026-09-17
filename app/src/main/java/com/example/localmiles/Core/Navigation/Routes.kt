@@ -8,13 +8,18 @@ object Routes {
 
     const val DISPATCHER_DASHBOARD = "dispatcher/dashboard"
     const val DRIVER_DASHBOARD = "driver/dashboard"
+    const val DRIVER_MY_JOBS = "driver/jobs"
+    const val DRIVER_JOB_STOPS = "driver/jobs/{jobId}/stops"
+    const val DRIVER_CAPTURE_POD = "driver/stops/{stopId}/pod/{jobId}"
     const val CLIENT_DASHBOARD = "client/dashboard"
 
     // Client-specific navigation routes
     const val CLIENT_TRACK_SHIPMENT = "client/track/{jobId}"
     const val CLIENT_SETTINGS = "client/settings"
 
-    // Builds the tracking route with the selected delivery job ID
+    // Helper functions for dynamic routes
+    fun driverJobStops(jobId: Long): String = "driver/jobs/$jobId/stops"
+    fun driverCapturePod(stopId: Long, jobId: Long): String = "driver/stops/$stopId/pod/$jobId"
     fun clientTrackShipment(jobId: Long): String = "client/track/$jobId"
 }
 
