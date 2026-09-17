@@ -29,24 +29,27 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Google/Firebase Web client ID used as serverClientId for Credential Manager.
-        // Set GOOGLE_WEB_CLIENT_ID in local.properties (see Firebase console -> Auth -> Google -> Web SDK config).
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
             "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"",
         )
 
-        // API base URL. Defaults to 10.0.2.2, the emulator's alias for the host machine's
-        // localhost, so it works out of the box when running the API on your own PC.
-        // On a physical device (or if the API runs elsewhere), set API_BASE_URL in
-        // local.properties to your machine's LAN IP, e.g.:
-        //   API_BASE_URL=http://192.168.1.23:3000/api/
         buildConfigField(
             "String",
             "API_BASE_URL",
             "\"${localProps.getProperty("API_BASE_URL") ?: "http://10.0.2.2:3000/api/"}\"",
         )
+    }
+
+    signingConfigs {
+        getByName("debug") {
+
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
