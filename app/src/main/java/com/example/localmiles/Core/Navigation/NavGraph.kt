@@ -200,8 +200,6 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
 
 
 
-
-
 /** Navigate to the role's home, clearing the auth screens from the back stack. */
 private fun NavHostController.goToHome(role: String?) {
     navigate(homeRouteForRole(role)) {
