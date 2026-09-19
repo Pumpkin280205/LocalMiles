@@ -29,6 +29,7 @@ import com.example.localmiles.Screens.Client.ClientDashboardScreen
 import com.example.localmiles.Screens.Client.ClientViewModel
 import com.example.localmiles.Screens.Client.SettingsScreen
 import com.example.localmiles.Screens.Client.TrackShipmentScreen
+import com.example.localmiles.Screens.Client.ClientViewModelFactory
 import com.example.localmiles.Screens.Driver.DriverDashboardScreen
 import com.example.localmiles.Screens.Driver.DriverViewModel
 import com.example.localmiles.Screens.Driver.MyJobsScreen
@@ -120,9 +121,11 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
             val context = LocalContext.current
 
             // ViewModel used to load deliveries belonging to the logged-in client
-            val clientViewModel = ClientViewModel(
-                jobRepository = JobRepository(
-                    session = SessionManager(context)
+            val clientViewModel: ClientViewModel = viewModel(
+                factory = ClientViewModelFactory(
+                    jobRepository = JobRepository(
+                        session = SessionManager(context)
+                    )
                 )
             )
 
@@ -170,9 +173,11 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
             val context = LocalContext.current
             val jobId = backStackEntry.arguments?.getLong("jobId") ?: return@composable
 
-            val clientViewModel = ClientViewModel(
-                jobRepository = JobRepository(
-                    session = SessionManager(context)
+            val clientViewModel: ClientViewModel = viewModel(
+                factory = ClientViewModelFactory(
+                    jobRepository = JobRepository(
+                        session = SessionManager(context)
+                    )
                 )
             )
 
