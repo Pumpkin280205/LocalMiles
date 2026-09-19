@@ -26,6 +26,9 @@ import com.example.localmiles.Core.Network.Dto.SyncActionListResponse
 import com.example.localmiles.Core.Network.Dto.SyncSubmitRequest
 import com.example.localmiles.Core.Network.Dto.SyncSubmitResponse
 import com.example.localmiles.Core.Network.Dto.UnreadCountResponse
+import com.example.localmiles.Core.Network.Dto.UserDetailResponse
+import com.example.localmiles.Core.Network.Dto.UserListResponse
+import com.example.localmiles.Core.Network.Dto.UserRoleUpdateRequest
 import com.example.localmiles.Core.Network.Dto.VehicleDetailResponse
 import com.example.localmiles.Core.Network.Dto.VehicleListResponse
 import com.example.localmiles.Core.Network.Dto.VehicleUpsertRequest
@@ -49,6 +52,16 @@ interface ApiService {
     // POST auth/login — exchange a Google/Firebase ID token for a session JWT.
     @POST("auth/login")
     suspend fun login(@Body body: LoginRequest): LoginResponse
+
+    // ----------------------------------------------------------------- Users ---
+
+    //admin only — every account and its role.
+    @GET("users")
+    suspend fun getUsers(): UserListResponse
+
+    //admin only — promote/demote a user's role.
+    @PATCH("users/{id}/role")
+    suspend fun updateUserRole(@Path("id") id: Long, @Body body: UserRoleUpdateRequest): UserDetailResponse
 
     // --------------------------------------------------------------- Depots ---
 
