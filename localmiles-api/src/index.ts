@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { loginHandler } from './controllers/authController.js';
 import { requireAuth, requireRole, ROLE } from './middleware/auth.js';
+import { createClient } from './controllers/clientController.js';
 import {
   listDepots,
   getDepot,
@@ -42,7 +43,7 @@ import {
   cancelStop,
 } from './controllers/stopController.js';
 import { getJobRoute } from './controllers/routeController.js';
-import { updateMe } from './controllers/userController.js';
+import { updateMe, listUsers, updateUserRole } from './controllers/userController.js';
 import {
   podUpload,
   submitPod,
@@ -80,6 +81,16 @@ app.use(requireAuth);
 
 // Self-service profile: any authenticated user edits their own row only.
 app.patch('/api/users/me', updateMe);
+
+// User/role administration: admin only. Lets an admin see every account and
+// promote/demote a role (self-signup never grants more than "client" — see
+// authController's DEFAULT_ROLE).
+app.get('/api/users', requireRole(ROLE.ADMIN), listUsers);
+app.patch('/api/users/:id/role', requireRole(ROLE.ADMIN), updateUserRole);
+
+// Clients: admin only. Links a User to a Client (company) record — the piece
+// self-signup can't do on its own, since a client only sees jobs once this exists.
+app.post('/api/clients', requireRole(ROLE.ADMIN), createClient);
 
 // Depots: any authenticated user can read; only admins can mutate.
 app.get('/api/depots', listDepots);

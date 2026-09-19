@@ -8,8 +8,10 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not set in the environment');
 }
 
-// Role a brand-new self-registered user is given.
-const DEFAULT_ROLE = 'driver';
+// Role a brand-new self-registered user is given. Least-privileged on purpose —
+// promotion to driver/admin happens via PATCH /api/users/:id/role (admin only),
+// never automatically at login.
+const DEFAULT_ROLE = 'client';
 
 export async function loginHandler(req: Request, res: Response) {
   try {

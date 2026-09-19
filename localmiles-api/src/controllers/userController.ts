@@ -1,9 +1,11 @@
 import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
-import { writeError } from '../lib/db.js';
+import { writeError, parseId } from '../lib/db.js';
+import { ROLE } from '../middleware/auth.js';
 
 const TABLE = 'User';
 const PK = 'UserId';
+const ASSIGNABLE_ROLES: string[] = Object.values(ROLE);
 
 interface ProfileFields {
   FirstName: string;
@@ -47,6 +49,36 @@ export async function updateMe(req: Request, res: Response) {
     .select('UserId, Email, FirstName, LastName, Role, IsActive, CreatedAt, LastLoginAt')
     .maybeSingle();
   if (error) return writeError(res, error, 'Could not update profile');
+  if (!data) return res.status(404).json({ error: 'User not found' });
+  return res.json({ user: data });
+}
+
+//GET /api/users — admin only. Lets an admin see every account and its role. */
+export async function listUsers(_req: Request, res: Response) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('UserId, Email, FirstName, LastName, Role, IsActive, CreatedAt, LastLoginAt')
+    .order(PK, { ascending: true });
+  if (error) return writeError(res, error, 'Database error');
+  return res.json({ users: data });
+}
+
+//PATCH /api/users/:id/role — admin only. Body: { Role: "admin" | "driver" | "client" }. */
+export async function updateUserRole(req: Request, res: Response) {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(400).json({ error: 'Invalid user id' });
+
+  const { Role } = req.body ?? {};
+  if (typeof Role !== 'string' || !ASSIGNABLE_ROLES.includes(Role))
+    return res.status(400).json({ error: `Role must be one of: ${ASSIGNABLE_ROLES.join(', ')}` });
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ Role })
+    .eq(PK, id)
+    .select('UserId, Email, FirstName, LastName, Role, IsActive, CreatedAt, LastLoginAt')
+    .maybeSingle();
+  if (error) return writeError(res, error, 'Could not update role');
   if (!data) return res.status(404).json({ error: 'User not found' });
   return res.json({ user: data });
 }

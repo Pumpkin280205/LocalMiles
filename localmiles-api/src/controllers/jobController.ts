@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
-import { parseId, writeError, posInt, isIsoDate, driverIdForUser } from '../lib/db.js';
+import { parseId, writeError, posInt, isIsoDate, driverIdForUser, clientIdForUser } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
 
 const TABLE = 'DeliveryJob';
@@ -157,9 +157,15 @@ export async function listJobs(req: Request, res: Response) {
   }
 
   if (q.mine === 'true') {
-    const driverId = await driverIdForUser(Number(req.user!.id));
-    if (driverId === null) return res.json({ jobs: [] });
-    query = query.eq('DriverId', driverId);
+    if (req.user!.role === ROLE.CLIENT) {
+      const clientId = await clientIdForUser(Number(req.user!.id));
+      if (clientId === null) return res.json({ jobs: [] });
+      query = query.eq('ClientId', clientId);
+    } else {
+      const driverId = await driverIdForUser(Number(req.user!.id));
+      if (driverId === null) return res.json({ jobs: [] });
+      query = query.eq('DriverId', driverId);
+    }
   }
 
   const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
