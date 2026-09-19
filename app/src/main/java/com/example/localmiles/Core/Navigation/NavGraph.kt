@@ -23,12 +23,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import com.example.localmiles.Core.Data.Repository.JobRepository
+import com.example.localmiles.Core.Data.Repository.StopRepository
 import com.example.localmiles.Core.Utils.SessionManager
 import com.example.localmiles.Screens.Client.ClientDashboardScreen
 import com.example.localmiles.Screens.Client.ClientViewModel
 import com.example.localmiles.Screens.Client.SettingsScreen
-import com.example.localmiles.Screens.Client.TrackShipmentScreen
 import com.example.localmiles.Screens.Client.ClientViewModelFactory
+import com.example.localmiles.Screens.Client.TrackShipmentScreen
+import com.example.localmiles.Screens.Driver.DriverDashboardScreen
+import com.example.localmiles.Screens.Driver.DriverViewModel
+import com.example.localmiles.Screens.Driver.MyJobsScreen
+import com.example.localmiles.Screens.Driver.PodCaptureScreen
+import com.example.localmiles.Screens.Driver.StopDetailsScreen
+
 @Composable
 fun NavGraph(nav: NavHostController = rememberNavController()) {
 
@@ -48,8 +55,67 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
 
         // Placeholder dashboards — replace with the real screens.
         composable(Routes.DISPATCHER_DASHBOARD) { PlaceholderDashboard("Dispatcher (admin)", nav) }
-        composable(Routes.DRIVER_DASHBOARD) { PlaceholderDashboard("Driver", nav) }
 
+        // --- Driver Flow ---
+        composable(Routes.DRIVER_DASHBOARD) {
+            val authViewModel: AuthViewModel = viewModel()
+            DriverDashboardScreen(
+                onViewJobs = { nav.navigate(Routes.DRIVER_MY_JOBS) },
+                onLogout = {
+                    authViewModel.logout()
+                    nav.navigate(Routes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.DRIVER_MY_JOBS) {
+            val driverViewModel: DriverViewModel = viewModel()
+
+            MyJobsScreen(
+                viewModel = driverViewModel,
+                onJobClick = { jobId -> nav.navigate(Routes.driverJobStops(jobId)) },
+                onBack = { nav.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.DRIVER_JOB_STOPS,
+            arguments = listOf(navArgument("jobId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val jobId = backStackEntry.arguments?.getLong("jobId") ?: return@composable
+            val driverViewModel: DriverViewModel = viewModel()
+
+            StopDetailsScreen(
+                jobId = jobId,
+                viewModel = driverViewModel,
+                onStopClick = { stopId -> nav.navigate(Routes.driverCapturePod(stopId, jobId)) },
+                onBack = { nav.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.DRIVER_CAPTURE_POD,
+            arguments = listOf(
+                navArgument("stopId") { type = NavType.LongType },
+                navArgument("jobId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val stopId = backStackEntry.arguments?.getLong("stopId") ?: return@composable
+            val jobId = backStackEntry.arguments?.getLong("jobId") ?: return@composable
+            val driverViewModel: DriverViewModel = viewModel()
+
+            PodCaptureScreen(
+                stopId = stopId,
+                jobId = jobId,
+                viewModel = driverViewModel,
+                onSuccess = { nav.popBackStack() },
+                onBack = { nav.popBackStack() }
+            )
+        }
+
+        // --- Client Flow ---
         composable(Routes.CLIENT_DASHBOARD) {
 
             val context = LocalContext.current
@@ -95,8 +161,7 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
             )
         }
 
-        // Displays tracking information for the delivery selected
-        // from the client dashboard.
+        // Displays tracking information for the delivery selected from the client dashboard.
         composable(
             route = Routes.CLIENT_TRACK_SHIPMENT,
             arguments = listOf(
@@ -105,12 +170,8 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
                 }
             )
         ) { backStackEntry ->
-
             val context = LocalContext.current
-
-            val jobId =
-                backStackEntry.arguments?.getLong("jobId")
-                    ?: return@composable
+            val jobId = backStackEntry.arguments?.getLong("jobId") ?: return@composable
 
             val clientViewModel: ClientViewModel = viewModel(
                 factory = ClientViewModelFactory(
@@ -139,9 +200,6 @@ fun NavGraph(nav: NavHostController = rememberNavController()) {
         }
     }
 }
-
-
-
 
 
 /** Navigate to the role's home, clearing the auth screens from the back stack. */
