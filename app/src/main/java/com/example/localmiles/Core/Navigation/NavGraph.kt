@@ -27,6 +27,7 @@ import com.example.localmiles.Core.Data.Repository.StopRepository
 import com.example.localmiles.Core.Utils.SessionManager
 import com.example.localmiles.Screens.Client.ClientDashboardScreen
 import com.example.localmiles.Screens.Client.ClientViewModel
+import com.example.localmiles.Screens.Client.ClientViewModelFactory
 import com.example.localmiles.Screens.Client.SettingsScreen
 import com.example.localmiles.Screens.Client.TrackShipmentScreen
 import com.example.localmiles.Screens.Client.ClientViewModelFactory
