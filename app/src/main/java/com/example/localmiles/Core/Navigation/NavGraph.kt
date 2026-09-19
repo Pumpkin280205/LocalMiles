@@ -29,7 +29,6 @@ import com.example.localmiles.Screens.Client.ClientDashboardScreen
 import com.example.localmiles.Screens.Client.ClientViewModel
 import com.example.localmiles.Screens.Client.ClientViewModelFactory
 import com.example.localmiles.Screens.Client.SettingsScreen
-import com.example.localmiles.Screens.Client.ClientViewModelFactory
 import com.example.localmiles.Screens.Client.TrackShipmentScreen
 import com.example.localmiles.Screens.Driver.DriverDashboardScreen
 import com.example.localmiles.Screens.Driver.DriverViewModel
