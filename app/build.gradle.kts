@@ -49,6 +49,19 @@ android {
         )
     }
 
+    // Shared debug keystore (app/debug.keystore) so every developer's debug build
+    // has the same SHA-1, which is what's registered in the Firebase console.
+    // Without this, Gradle falls back to each machine's own auto-generated
+    // ~/.android/debug.keystore, and Google sign-in fails with an unregistered SHA-1.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             optimization {
