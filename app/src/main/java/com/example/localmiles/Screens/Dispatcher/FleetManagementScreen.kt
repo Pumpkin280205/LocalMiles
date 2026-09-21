@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FleetManagementScreen(
     viewModel: DispatcherViewModel,
