@@ -121,6 +121,24 @@ export async function createDriver(req: Request, res: Response) {
   const parsed = parseDriverInput(req.body, false);
   if (!parsed.ok) return res.status(400).json({ error: parsed.error });
 
+  // UserId is unique on this table, and demoting a driver only soft-deletes
+  // their row (IsActive = false) rather than removing it — so re-promoting
+  // the same person must reactivate/update that row instead of inserting.
+  const { data: existing, error: existingErr } = await supabase
+    .from(TABLE).select('DriverId').eq('UserId', parsed.value.UserId!).maybeSingle();
+  if (existingErr) return writeError(res, existingErr, 'Database error');
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update({ ...parsed.value, IsActive: true })
+      .eq(PK, existing.DriverId)
+      .select()
+      .maybeSingle();
+    if (error) return writeError(res, error, 'Could not reactivate driver');
+    return res.status(200).json({ driver: data });
+  }
+
   const { data, error } = await supabase.from(TABLE).insert(parsed.value).select().single();
   if (error) return writeError(res, error, 'Could not create driver');
   return res.status(201).json({ driver: data });

@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { loginHandler } from './controllers/authController.js';
+import { loginHandler, switchRoleHandler } from './controllers/authController.js';
 import { requireAuth, requireRole, ROLE } from './middleware/auth.js';
 import { createClient } from './controllers/clientController.js';
 import {
@@ -81,6 +81,11 @@ app.use(requireAuth);
 
 // Self-service profile: any authenticated user edits their own row only.
 app.patch('/api/users/me', updateMe);
+
+// DEV/TEST ONLY: lets a signed-in user change their own role with no admin
+// approval, for quickly switching between the client/driver/admin flows
+// while developing. 404s outside development — see switchRoleHandler.
+app.patch('/api/auth/switch-role', switchRoleHandler);
 
 // User/role administration: admin only. Lets an admin see every account and
 // promote/demote a role (self-signup never grants more than "client" — see
