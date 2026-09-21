@@ -24,6 +24,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
+import com.example.localmiles.Core.Data.Repository.DepotRepository
+import com.example.localmiles.Core.Data.Repository.DriverRepository
 import com.example.localmiles.Core.Data.Repository.JobRepository
 import com.example.localmiles.Core.Data.Repository.UserRepository
 import com.example.localmiles.Core.Network.RetrofitClient
@@ -569,6 +571,12 @@ fun NavGraph(
                 viewModel(
                     factory = UserManagementViewModelFactory(
                         userRepository = UserRepository(
+                            session = SessionManager(context)
+                        ),
+                        driverRepository = DriverRepository(
+                            session = SessionManager(context)
+                        ),
+                        depotRepository = DepotRepository(
                             session = SessionManager(context)
                         )
                     )
