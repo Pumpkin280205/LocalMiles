@@ -45,6 +45,9 @@ object Routes {
 
     const val DRIVER_CAPTURE_POD = "driver/stops/{stopId}/pod/{jobId}"
 
+    // Driver account settings
+    const val DRIVER_SETTINGS = "driver/settings"
+
 
     // ============================================================
     // CLIENT ROUTES

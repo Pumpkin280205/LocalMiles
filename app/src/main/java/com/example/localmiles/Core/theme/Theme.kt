@@ -4,8 +4,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.localmiles.Core.Utils.ThemeMode
+import com.example.localmiles.Core.Utils.ThemePreferences
 
 // Top app bars/headers use primaryContainer (see AppTopBar), CTAs use primary —
 // this matches the brand mockups: dark teal chrome, green action buttons.
@@ -74,9 +78,16 @@ private val DarkColorScheme = darkColorScheme(
 // Android 12+, so the app always renders in LocalMiles' own colors instead.
 @Composable
 fun LocalMilesTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
+    val themeMode by ThemePreferences.themeMode.collectAsState()
+
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     MaterialTheme(

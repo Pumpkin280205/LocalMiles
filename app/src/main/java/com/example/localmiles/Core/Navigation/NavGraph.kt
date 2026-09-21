@@ -57,6 +57,7 @@ import com.example.localmiles.Screens.Dispatcher.UserManagementViewModel
 import com.example.localmiles.Screens.Dispatcher.UserManagementViewModelFactory
 
 import com.example.localmiles.Screens.Driver.DriverDashboardScreen
+import com.example.localmiles.Screens.Driver.DriverSettingsScreen
 import com.example.localmiles.Screens.Driver.DriverViewModel
 import com.example.localmiles.Screens.Driver.MyJobsScreen
 import com.example.localmiles.Screens.Driver.PodCaptureScreen
@@ -608,6 +609,12 @@ fun NavGraph(
                     )
                 },
 
+                onSettings = {
+                    nav.navigate(
+                        Routes.DRIVER_SETTINGS
+                    )
+                },
+
                 onLogout = {
 
                     authViewModel.logout()
@@ -620,6 +627,20 @@ fun NavGraph(
                             inclusive = true
                         }
                     }
+                }
+            )
+        }
+
+
+        // ========================================================
+        // DRIVER - SETTINGS
+        // ========================================================
+
+        composable(Routes.DRIVER_SETTINGS) {
+
+            DriverSettingsScreen(
+                onBack = {
+                    nav.popBackStack()
                 }
             )
         }

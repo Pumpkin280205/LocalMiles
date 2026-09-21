@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
@@ -24,24 +25,19 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val SettingsDarkBlue = Color(0xFF004759)
-private val SettingsGreen = Color(0xFF018B58)
-private val SettingsOrange = Color(0xFFF28800)
-private val SettingsBackground = Color(0xFFF7F8F9)
-private val SettingsGrey = Color(0xFF6E7478)
-private val SettingsLightGrey = Color(0xFFE9ECEF)
+import com.example.localmiles.Core.Utils.ThemeMode
+import com.example.localmiles.Core.Utils.ThemePreferences
 
 @Composable
 fun SettingsScreen(
@@ -74,15 +70,17 @@ fun SettingsScreen(
         )
     }
 
+    val themeMode by ThemePreferences.themeMode.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SettingsBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
 
         // LocalMiles top bar
         Surface(
-            color = SettingsDarkBlue,
+            color = MaterialTheme.colorScheme.primaryContainer,
             shadowElevation = 4.dp
         ) {
             Row(
@@ -97,7 +95,7 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "‹",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 34.sp
                     )
                 }
@@ -105,14 +103,14 @@ fun SettingsScreen(
                 Column {
                     Text(
                         text = "Settings",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
                         text = "Client preferences",
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                         fontSize = 12.sp
                     )
                 }
@@ -127,14 +125,14 @@ fun SettingsScreen(
 
             Text(
                 text = "Preferences",
-                color = SettingsDarkBlue,
+                color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
                 text = "Manage your LocalMiles experience.",
-                color = SettingsGrey,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
 
@@ -152,7 +150,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
                 elevation = CardDefaults.cardElevation(
                     defaultElevation = 2.dp
@@ -174,7 +172,7 @@ fun SettingsScreen(
 
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        color = SettingsLightGrey
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     )
 
                     LanguageOption(
@@ -205,7 +203,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
                 elevation = CardDefaults.cardElevation(
                     defaultElevation = 2.dp
@@ -231,6 +229,67 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // APPEARANCE
+            SettingsSectionTitle(
+                title = "Appearance",
+                description = "Choose how LocalMiles looks on this device."
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = 2.dp
+                )
+            ) {
+                Column {
+
+                    ThemeOption(
+                        label = "System default",
+                        selectedMode = themeMode,
+                        mode = ThemeMode.SYSTEM,
+                        onSelected = {
+                            ThemePreferences.setThemeMode(ThemeMode.SYSTEM)
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
+
+                    ThemeOption(
+                        label = "Light",
+                        selectedMode = themeMode,
+                        mode = ThemeMode.LIGHT,
+                        onSelected = {
+                            ThemePreferences.setThemeMode(ThemeMode.LIGHT)
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    )
+
+                    ThemeOption(
+                        label = "Dark",
+                        selectedMode = themeMode,
+                        mode = ThemeMode.DARK,
+                        onSelected = {
+                            ThemePreferences.setThemeMode(ThemeMode.DARK)
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // DATA USAGE
             SettingsSectionTitle(
                 title = "Data Usage",
@@ -243,7 +302,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
                 elevation = CardDefaults.cardElevation(
                     defaultElevation = 2.dp
@@ -274,7 +333,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = SettingsDarkBlue
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
                 Column(
@@ -282,14 +341,14 @@ fun SettingsScreen(
                 ) {
                     Text(
                         text = "LocalMiles",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
                         text = "Deliver locally. Drive further.",
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                         fontSize = 13.sp
                     )
 
@@ -297,7 +356,7 @@ fun SettingsScreen(
 
                     Text(
                         text = "Secure • Reliable • Connected",
-                        color = SettingsGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -314,14 +373,14 @@ private fun SettingsSectionTitle(
 ) {
     Text(
         text = title,
-        color = SettingsDarkBlue,
+        color = MaterialTheme.colorScheme.onBackground,
         fontSize = 17.sp,
         fontWeight = FontWeight.Bold
     )
 
     Text(
         text = description,
-        color = SettingsGrey,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontSize = 12.sp
     )
 }
@@ -349,15 +408,56 @@ private fun LanguageOption(
             selected = selectedLanguage == language,
             onClick = onSelected,
             colors = RadioButtonDefaults.colors(
-                selectedColor = SettingsGreen
+                selectedColor = MaterialTheme.colorScheme.primary
             )
         )
 
         Text(
             text = language,
-            color = SettingsDarkBlue,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 15.sp,
             fontWeight = if (selectedLanguage == language) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Normal
+            }
+        )
+    }
+}
+
+@Composable
+private fun ThemeOption(
+    label: String,
+    selectedMode: ThemeMode,
+    mode: ThemeMode,
+    onSelected: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                onSelected()
+            }
+            .padding(
+                horizontal = 12.dp,
+                vertical = 6.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        RadioButton(
+            selected = selectedMode == mode,
+            onClick = onSelected,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary
+            )
+        )
+
+        Text(
+            text = label,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 15.sp,
+            fontWeight = if (selectedMode == mode) {
                 FontWeight.SemiBold
             } else {
                 FontWeight.Normal
@@ -389,7 +489,7 @@ private fun SettingSwitchRow(
 
             Text(
                 text = title,
-                color = SettingsDarkBlue,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -398,7 +498,7 @@ private fun SettingSwitchRow(
 
             Text(
                 text = description,
-                color = SettingsGrey,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
@@ -407,10 +507,10 @@ private fun SettingSwitchRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = SettingsGreen,
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = SettingsGrey
+                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.surface,
+                uncheckedTrackColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
     }

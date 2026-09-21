@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.localmiles.Common.Components.ThemeModeSetting
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,6 +221,12 @@ fun DispatcherSettingsScreen(
                     )
                 }
             }
+
+            Spacer(
+                modifier = Modifier.height(8.dp)
+            )
+
+            ThemeModeSetting()
         }
     }
 }

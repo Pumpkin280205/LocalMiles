@@ -8,6 +8,7 @@ import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.JobUpsertRequest
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
+import com.example.localmiles.Core.Network.Dto.VehicleUpsertRequest
 import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Utils.Result
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,9 +66,9 @@ class DispatcherViewModel(
                     active = true
                 )
 
-                val vehiclesResponse = api.getVehicles(
-                    active = true
-                )
+                // Unfiltered so Fleet Management can also show (and reactivate)
+                // inactive vehicles — CreateJobScreen filters isActive itself.
+                val vehiclesResponse = api.getVehicles()
 
                 val depotsResponse = api.getDepots(
                     active = true
@@ -367,6 +368,44 @@ class DispatcherViewModel(
         _uiState.value = _uiState.value.copy(
             errorMessage = null
         )
+    }
+
+
+    /**
+     * Activates or deactivates a vehicle from Fleet Management.
+     */
+    fun setVehicleActive(
+        vehicleId: Long,
+        active: Boolean
+    ) {
+
+        viewModelScope.launch {
+
+            try {
+
+                val response = api.updateVehicle(
+                    id = vehicleId,
+                    body = VehicleUpsertRequest(isActive = active)
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    vehicles = _uiState.value.vehicles.map { vehicle ->
+
+                        if (vehicle.vehicleId == vehicleId) {
+                            response.vehicle
+                        } else {
+                            vehicle
+                        }
+                    }
+                )
+
+            } catch (e: Exception) {
+
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = e.message ?: "Unable to update vehicle."
+                )
+            }
+        }
     }
 
 

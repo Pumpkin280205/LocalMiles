@@ -38,15 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.localmiles.Core.Network.Dto.StopResponse
 
-// LocalMiles colours based on the project mock-up
-private val LocalMilesDarkBlue = Color(0xFF004759)
-private val LocalMilesGreen = Color(0xFF018B58)
-private val LocalMilesLime = Color(0xFF8AC237)
-private val LocalMilesOrange = Color(0xFFF28800)
-private val LocalMilesBackground = Color(0xFFF7F8F9)
-private val LocalMilesGrey = Color(0xFF6E7478)
-private val LocalMilesLightGrey = Color(0xFFE9ECEF)
-
 @Composable
 fun TrackShipmentScreen(
     jobId: Long,
@@ -62,12 +53,12 @@ fun TrackShipmentScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LocalMilesBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
 
         // Top app bar
         Surface(
-            color = LocalMilesDarkBlue,
+            color = MaterialTheme.colorScheme.primaryContainer,
             shadowElevation = 4.dp
         ) {
             Row(
@@ -80,7 +71,7 @@ fun TrackShipmentScreen(
                 TextButton(onClick = onBack) {
                     Text(
                         text = "‹",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 34.sp,
                         fontWeight = FontWeight.Normal
                     )
@@ -89,14 +80,14 @@ fun TrackShipmentScreen(
                 Column {
                     Text(
                         text = "Track Shipment",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
                         text = "Delivery #$jobId",
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                         fontSize = 12.sp
                     )
                 }
@@ -110,7 +101,7 @@ fun TrackShipmentScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = LocalMilesGreen
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -127,7 +118,7 @@ fun TrackShipmentScreen(
                         text = "Unable to load shipment",
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = LocalMilesDarkBlue
+                        color = MaterialTheme.colorScheme.onBackground
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -135,7 +126,7 @@ fun TrackShipmentScreen(
                     Text(
                         text = uiState.errorMessage
                             ?: "Unable to load shipment.",
-                        color = LocalMilesGrey
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -145,10 +136,13 @@ fun TrackShipmentScreen(
                             viewModel.loadShipmentTracking(jobId)
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = LocalMilesGreen
+                            containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("Try Again")
+                        Text(
+                            text = "Try Again",
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
                     }
                 }
             }
@@ -171,7 +165,7 @@ fun TrackShipmentScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = Color.White
+                                containerColor = MaterialTheme.colorScheme.surface
                             ),
                             elevation = CardDefaults.cardElevation(
                                 defaultElevation = 2.dp
@@ -183,7 +177,7 @@ fun TrackShipmentScreen(
 
                                 Text(
                                     text = "Estimated Delivery",
-                                    color = LocalMilesGrey,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 13.sp
                                 )
 
@@ -191,7 +185,7 @@ fun TrackShipmentScreen(
 
                                 Text(
                                     text = formatScheduledDate(job.scheduledDate),
-                                    color = LocalMilesGreen,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -204,7 +198,7 @@ fun TrackShipmentScreen(
 
                                 Text(
                                     text = statusMessage(job.status),
-                                    color = LocalMilesGrey,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 14.sp
                                 )
 
@@ -225,7 +219,7 @@ fun TrackShipmentScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = Color.White
+                                containerColor = MaterialTheme.colorScheme.surface
                             ),
                             elevation = CardDefaults.cardElevation(
                                 defaultElevation = 2.dp
@@ -237,7 +231,7 @@ fun TrackShipmentScreen(
 
                                 Text(
                                     text = "Delivery Details",
-                                    color = LocalMilesDarkBlue,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -293,14 +287,14 @@ fun TrackShipmentScreen(
                         ) {
                             Text(
                                 text = "Stops",
-                                color = LocalMilesDarkBlue,
+                                color = MaterialTheme.colorScheme.onBackground,
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold
                             )
 
                             Text(
                                 text = "${uiState.stops.size} total",
-                                color = LocalMilesGreen,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -311,13 +305,13 @@ fun TrackShipmentScreen(
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = Color.White
+                                    containerColor = MaterialTheme.colorScheme.surface
                                 )
                             ) {
                                 Text(
                                     text = "No delivery stops are available for this shipment.",
                                     modifier = Modifier.padding(18.dp),
-                                    color = LocalMilesGrey
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -340,14 +334,14 @@ fun TrackShipmentScreen(
                         Text(
                             text = "LocalMiles",
                             modifier = Modifier.fillMaxWidth(),
-                            color = LocalMilesDarkBlue,
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
 
                         Text(
                             text = "Deliver locally. Drive further.",
-                            color = LocalMilesGrey,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
 
@@ -363,7 +357,7 @@ fun TrackShipmentScreen(
                 ) {
                     Text(
                         text = "Shipment information is unavailable.",
-                        color = LocalMilesGrey
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -371,19 +365,28 @@ fun TrackShipmentScreen(
     }
 }
 
+// Maps a status string to a (background, content) color pair drawn from the
+// active MaterialTheme, so status colors invert correctly in dark mode.
+@Composable
+private fun statusColorPair(status: String): Pair<Color, Color> {
+    val colorScheme = MaterialTheme.colorScheme
+
+    return when (status.lowercase()) {
+        "completed", "delivered" -> colorScheme.primary to colorScheme.onPrimary
+        "enroute", "en route", "in progress" -> colorScheme.secondary to colorScheme.onSecondary
+        "cancelled", "failed" -> colorScheme.error to colorScheme.onError
+        "pending" -> colorScheme.tertiary to colorScheme.onTertiary
+        else -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
+    }
+}
+
 @Composable
 private fun StatusPill(status: String) {
 
-    val colour = when (status.lowercase()) {
-        "completed", "delivered" -> LocalMilesGreen
-        "enroute", "en route", "in progress" -> LocalMilesLime
-        "cancelled", "failed" -> Color(0xFFD9534F)
-        "pending" -> LocalMilesOrange
-        else -> LocalMilesDarkBlue
-    }
+    val (backgroundColor, contentColor) = statusColorPair(status)
 
     Surface(
-        color = colour,
+        color = backgroundColor,
         shape = RoundedCornerShape(50.dp)
     ) {
         Text(
@@ -392,7 +395,7 @@ private fun StatusPill(status: String) {
                 horizontal = 14.dp,
                 vertical = 6.dp
             ),
-            color = Color.White,
+            color = contentColor,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
         )
@@ -410,6 +413,11 @@ private fun ShipmentProgress(status: String) {
         else -> 1
     }
 
+    val completedColor = MaterialTheme.colorScheme.primary
+    val completedContentColor = MaterialTheme.colorScheme.onPrimary
+    val pendingColor = MaterialTheme.colorScheme.surfaceVariant
+    val pendingContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -422,9 +430,9 @@ private fun ShipmentProgress(status: String) {
                     .size(26.dp)
                     .background(
                         color = if (step <= completedSteps)
-                            LocalMilesGreen
+                            completedColor
                         else
-                            LocalMilesLightGrey,
+                            pendingColor,
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
@@ -432,9 +440,9 @@ private fun ShipmentProgress(status: String) {
                 Text(
                     text = if (step <= completedSteps) "✓" else "$step",
                     color = if (step <= completedSteps)
-                        Color.White
+                        completedContentColor
                     else
-                        LocalMilesGrey,
+                        pendingContentColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -447,9 +455,9 @@ private fun ShipmentProgress(status: String) {
                         .height(3.dp)
                         .background(
                             if (step < completedSteps)
-                                LocalMilesGreen
+                                completedColor
                             else
-                                LocalMilesLightGrey
+                                pendingColor
                         )
                 )
             }
@@ -469,13 +477,13 @@ private fun TrackingDetailRow(
     ) {
         Text(
             text = label,
-            color = LocalMilesGrey,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )
 
         Text(
             text = value,
-            color = LocalMilesDarkBlue,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp
         )
@@ -487,19 +495,13 @@ private fun DeliveryStopCard(
     stop: StopResponse
 ) {
 
-    val statusColour = when (stop.status.lowercase()) {
-        "completed", "delivered" -> LocalMilesGreen
-        "enroute", "en route", "in progress" -> LocalMilesLime
-        "cancelled", "failed" -> Color(0xFFD9534F)
-        "pending" -> LocalMilesOrange
-        else -> LocalMilesDarkBlue
-    }
+    val (statusColour, statusContentColour) = statusColorPair(stop.status)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
@@ -523,7 +525,7 @@ private fun DeliveryStopCard(
             ) {
                 Text(
                     text = stop.sequenceNumber.toString(),
-                    color = Color.White,
+                    color = statusContentColour,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -543,7 +545,7 @@ private fun DeliveryStopCard(
                     Text(
                         text = stop.recipientName,
                         modifier = Modifier.weight(1f),
-                        color = LocalMilesDarkBlue,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -560,7 +562,7 @@ private fun DeliveryStopCard(
 
                 Text(
                     text = stop.address,
-                    color = LocalMilesGrey,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
 
@@ -576,7 +578,7 @@ private fun DeliveryStopCard(
                         } - ${
                             stop.deliveryWindowEnd ?: "N/A"
                         }",
-                        color = LocalMilesGrey,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                 }
@@ -589,14 +591,14 @@ private fun DeliveryStopCard(
 
                         Text(
                             text = "Instructions",
-                            color = LocalMilesDarkBlue,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
 
                         Text(
                             text = instructions,
-                            color = LocalMilesGrey,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
                         )
                     }
@@ -606,7 +608,7 @@ private fun DeliveryStopCard(
 
                     Text(
                         text = "Arrived: ${formatDateTime(arrived)}",
-                        color = LocalMilesGrey,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
@@ -614,7 +616,7 @@ private fun DeliveryStopCard(
                 stop.completedAt?.let { completed ->
                     Text(
                         text = "Completed: ${formatDateTime(completed)}",
-                        color = LocalMilesGreen,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 11.sp
                     )
                 }

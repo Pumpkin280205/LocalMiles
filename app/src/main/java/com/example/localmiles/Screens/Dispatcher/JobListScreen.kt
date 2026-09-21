@@ -644,14 +644,17 @@ private fun JobCard(
                     )
                 }
 
-                IconButton(
-                    onClick = onDelete
-                ) {
+                if (!job.status.equals("Cancelled", ignoreCase = true)) {
 
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Cancel job"
-                    )
+                    IconButton(
+                        onClick = onDelete
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Cancel job"
+                        )
+                    }
                 }
             }
 

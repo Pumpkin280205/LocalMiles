@@ -34,6 +34,9 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
     var currentJobStops by mutableStateOf<List<StopResponse>>(emptyList())
         private set
 
+    var currentJob by mutableStateOf<JobResponse?>(null)
+        private set
+
     fun loadMyJobs() {
         viewModelScope.launch {
             isLoading = true
@@ -50,6 +53,12 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             isLoading = true
             error = null
+
+            when (val jobResult = jobRepository.getJob(jobId)) {
+                is Result.Success -> currentJob = jobResult.data
+                is Result.Error -> error = jobResult.message
+            }
+
             when (val result = stopRepository.getStopsForJob(jobId)) {
                 is Result.Success -> currentJobStops = result.data
                 is Result.Error -> error = result.message

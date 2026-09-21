@@ -33,19 +33,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.localmiles.Core.Network.JobResponse
-
-private val LocalMilesTeal = Color(0xFF004759)
-private val LocalMilesGreen = Color(0xFF018B58)
-private val LocalMilesLime = Color(0xFF8AC237)
-private val LocalMilesOrange = Color(0xFFF28800)
-private val ScreenBackground = Color(0xFFF7F8F8)
-private val SoftGrey = Color(0xFFF1F3F3)
-private val TextGrey = Color(0xFF667277)
 
 @Composable
 fun ClientDashboardScreen(
@@ -63,14 +54,14 @@ fun ClientDashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBackground)
+            .background(MaterialTheme.colorScheme.background)
     ) {
 
         // LocalMiles header
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(LocalMilesTeal)
+                .background(MaterialTheme.colorScheme.primaryContainer)
                 .statusBarsPadding()
                 .padding(horizontal = 18.dp, vertical = 16.dp)
         ) {
@@ -82,14 +73,14 @@ fun ClientDashboardScreen(
                 Column {
                     Text(
                         text = "LocalMiles",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     Text(
                         text = "Client Dashboard",
-                        color = Color.White.copy(alpha = 0.8f),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                         fontSize = 12.sp
                     )
                 }
@@ -97,7 +88,7 @@ fun ClientDashboardScreen(
                 TextButton(onClick = onOpenSettings) {
                     Text(
                         text = "Settings",
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -124,7 +115,7 @@ fun ClientDashboardScreen(
                         text = "My Deliveries",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = LocalMilesTeal
+                        color = MaterialTheme.colorScheme.onBackground
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -132,14 +123,14 @@ fun ClientDashboardScreen(
                     Text(
                         text = "Track your shipments in real time.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextGrey
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 TextButton(onClick = onLogout) {
                     Text(
                         text = "Log out",
-                        color = LocalMilesOrange,
+                        color = MaterialTheme.colorScheme.tertiary,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -156,7 +147,7 @@ fun ClientDashboardScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
-                            color = LocalMilesGreen
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -179,7 +170,7 @@ fun ClientDashboardScreen(
                     Text(
                         text = "${uiState.jobs.size} shipments",
                         style = MaterialTheme.typography.labelLarge,
-                        color = TextGrey
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -216,7 +207,7 @@ private fun ClientDeliveryCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
@@ -235,7 +226,7 @@ private fun ClientDeliveryCard(
                     text = "Delivery #${job.jobId}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = LocalMilesTeal
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 StatusBadge(status = job.status)
@@ -244,7 +235,7 @@ private fun ClientDeliveryCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             HorizontalDivider(
-                color = Color(0xFFE6EAEA)
+                color = MaterialTheme.colorScheme.surfaceVariant
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -290,12 +281,12 @@ private fun ClientDeliveryCard(
                     .height(48.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = LocalMilesGreen
+                    containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(
                     text = "Track Shipment",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -315,14 +306,14 @@ private fun DeliveryInformationRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = TextGrey
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
-            color = LocalMilesTeal
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -331,12 +322,14 @@ private fun DeliveryInformationRow(
 private fun StatusBadge(
     status: String
 ) {
-    val backgroundColor = when (status.lowercase()) {
-        "completed", "delivered" -> LocalMilesGreen
-        "enroute", "en route", "inprogress", "in progress" -> LocalMilesLime
-        "pending" -> LocalMilesOrange
-        "cancelled", "failed" -> Color(0xFFC94B45)
-        else -> LocalMilesTeal
+    val colorScheme = MaterialTheme.colorScheme
+
+    val (backgroundColor, contentColor) = when (status.lowercase()) {
+        "completed", "delivered" -> colorScheme.primary to colorScheme.onPrimary
+        "enroute", "en route", "inprogress", "in progress" -> colorScheme.secondary to colorScheme.onSecondary
+        "pending" -> colorScheme.tertiary to colorScheme.onTertiary
+        "cancelled", "failed" -> colorScheme.error to colorScheme.onError
+        else -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
     }
 
     Surface(
@@ -349,7 +342,7 @@ private fun StatusBadge(
                 horizontal = 12.dp,
                 vertical = 6.dp
             ),
-            color = Color.White,
+            color = contentColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold
         )
@@ -362,7 +355,7 @@ private fun EmptyDeliveriesCard() {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -375,7 +368,7 @@ private fun EmptyDeliveriesCard() {
                 modifier = Modifier
                     .size(50.dp)
                     .background(
-                        color = SoftGrey,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = CircleShape
                     )
             )
@@ -386,7 +379,7 @@ private fun EmptyDeliveriesCard() {
                 text = "No deliveries yet",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = LocalMilesTeal
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -394,7 +387,7 @@ private fun EmptyDeliveriesCard() {
             Text(
                 text = "Your assigned shipments will appear here.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextGrey
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -409,7 +402,7 @@ private fun ErrorCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Column(
@@ -419,14 +412,14 @@ private fun ErrorCard(
                 text = "Unable to load deliveries",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFC94B45)
+                color = MaterialTheme.colorScheme.error
             )
 
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = message,
-                color = TextGrey
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -437,7 +430,7 @@ private fun ErrorCard(
             ) {
                 Text(
                     text = "Try Again",
-                    color = LocalMilesTeal
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -256,7 +257,13 @@ fun FleetManagementScreen(
                         ) { vehicle ->
 
                             FleetVehicleCard(
-                                vehicle = vehicle
+                                vehicle = vehicle,
+                                onToggleActive = { active ->
+                                    viewModel.setVehicleActive(
+                                        vehicleId = vehicle.vehicleId,
+                                        active = active
+                                    )
+                                }
                             )
                         }
                     }
@@ -482,7 +489,8 @@ private fun FleetDriverCard(
 
 @Composable
 private fun FleetVehicleCard(
-    vehicle: VehicleResponse
+    vehicle: VehicleResponse,
+    onToggleActive: (Boolean) -> Unit
 ) {
     val statusText = when {
         !vehicle.isActive -> "Inactive"
@@ -553,6 +561,39 @@ private fun FleetVehicleCard(
             Text(
                 text = "Depot ID: ${vehicle.depotId}"
             )
+
+            HorizontalDivider()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Active",
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = if (vehicle.isActive) {
+                            "This vehicle can be assigned to jobs."
+                        } else {
+                            "This vehicle is hidden from job assignment."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Switch(
+                    checked = vehicle.isActive,
+                    onCheckedChange = onToggleActive
+                )
+            }
         }
     }
 }

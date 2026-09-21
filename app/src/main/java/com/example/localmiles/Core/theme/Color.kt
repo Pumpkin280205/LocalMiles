@@ -2,9 +2,9 @@ package com.example.localmiles.Core.theme
 
 import androidx.compose.ui.graphics.Color
 
-// LocalMiles brand palette — keep in sync with the Client screens' local copies
-// (ClientDashboardScreen/SettingsScreen/TrackShipmentScreen) until those are
-// migrated to read from MaterialTheme instead of hardcoding these values.
+// LocalMiles brand palette, wired into LightColorScheme/DarkColorScheme below.
+// Every screen (including Client) now reads colors from MaterialTheme.colorScheme
+// rather than hardcoding these values, so this is the single source of truth.
 val LocalMilesDarkTeal = Color(0xFF004759)
 val LocalMilesGreen = Color(0xFF018B58)
 val LocalMilesLime = Color(0xFF8AC237)
