@@ -1,6 +1,8 @@
 package com.example.localmiles.Screens.Client
 
 import android.content.Context
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,10 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,13 +30,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.Button
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.unit.sp
 
-// Settings available to LocalMiles clients.
+private val SettingsDarkBlue = Color(0xFF004759)
+private val SettingsGreen = Color(0xFF018B58)
+private val SettingsOrange = Color(0xFFF28800)
+private val SettingsBackground = Color(0xFFF7F8F9)
+private val SettingsGrey = Color(0xFF6E7478)
+private val SettingsLightGrey = Color(0xFFE9ECEF)
 
 @Composable
 fun SettingsScreen(
@@ -36,7 +49,6 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
 
-    // Store client settings locally on the device.
     val preferences = remember {
         context.getSharedPreferences(
             "localmiles_client_settings",
@@ -44,21 +56,18 @@ fun SettingsScreen(
         )
     }
 
-    // Load the previously selected language
     var selectedLanguage by remember {
         mutableStateOf(
             preferences.getString("language", "English") ?: "English"
         )
     }
 
-    // Load the previously selected notification preference.
     var notificationsEnabled by remember {
         mutableStateOf(
             preferences.getBoolean("notifications_enabled", true)
         )
     }
 
-    // Load the previously selected data saver preference.
     var dataSaverEnabled by remember {
         mutableStateOf(
             preferences.getBoolean("data_saver_enabled", false)
@@ -68,141 +77,255 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .padding(16.dp)
+            .background(SettingsBackground)
     ) {
 
-        // Return to the client dashboard.
-        Button(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
+        // LocalMiles top bar
+        Surface(
+            color = SettingsDarkBlue,
+            shadowElevation = 4.dp
         ) {
-            Text("Back to Dashboard")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(
+                    onClick = onBack
+                ) {
+                    Text(
+                        text = "‹",
+                        color = Color.White,
+                        fontSize = 34.sp
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = "Settings",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Client preferences",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
 
-        Text(
-            text = "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Manage your LocalMiles preferences",
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Language setting
-        Text(
-            text = "Language",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Text(
-            text = "Choose your preferred app language.",
-            style = MaterialTheme.typography.bodySmall
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
-            ) {
 
-                LanguageOption(
-                    language = "English",
-                    selectedLanguage = selectedLanguage,
-                    onSelected = {
-                        selectedLanguage = "English"
+            Text(
+                text = "Preferences",
+                color = SettingsDarkBlue,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
 
-                        preferences.edit()
-                            .putString("language", "English")
-                            .apply()
-                    }
+            Text(
+                text = "Manage your LocalMiles experience.",
+                color = SettingsGrey,
+                fontSize = 14.sp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // LANGUAGE
+            SettingsSectionTitle(
+                title = "Language",
+                description = "Choose your preferred app language."
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = 2.dp
                 )
+            ) {
+                Column {
 
-                LanguageOption(
-                    language = "isiZulu",
-                    selectedLanguage = selectedLanguage,
-                    onSelected = {
-                        selectedLanguage = "isiZulu"
+                    LanguageOption(
+                        language = "English",
+                        selectedLanguage = selectedLanguage,
+                        onSelected = {
+                            selectedLanguage = "English"
+
+                            preferences.edit()
+                                .putString("language", "English")
+                                .apply()
+                        }
+                    )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = SettingsLightGrey
+                    )
+
+                    LanguageOption(
+                        language = "isiZulu",
+                        selectedLanguage = selectedLanguage,
+                        onSelected = {
+                            selectedLanguage = "isiZulu"
+
+                            preferences.edit()
+                                .putString("language", "isiZulu")
+                                .apply()
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // NOTIFICATIONS
+            SettingsSectionTitle(
+                title = "Notifications",
+                description = "Choose which updates you want to receive."
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = 2.dp
+                )
+            ) {
+                SettingSwitchRow(
+                    title = "Delivery notifications",
+                    description = "Receive shipment status and delivery updates.",
+                    checked = notificationsEnabled,
+                    onCheckedChange = { enabled ->
+
+                        notificationsEnabled = enabled
 
                         preferences.edit()
-                            .putString("language", "isiZulu")
+                            .putBoolean(
+                                "notifications_enabled",
+                                enabled
+                            )
                             .apply()
                     }
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-
-        // Notification setting
-        Text(
-            text = "Notifications",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            SettingSwitchRow(
-                title = "Delivery notifications",
-                description = "Receive shipment status and delivery updates.",
-                checked = notificationsEnabled,
-                onCheckedChange = { enabled ->
-
-                    notificationsEnabled = enabled
-
-                    preferences.edit()
-                        .putBoolean("notifications_enabled", enabled)
-                        .apply()
-                }
+            // DATA USAGE
+            SettingsSectionTitle(
+                title = "Data Usage",
+                description = "Control how LocalMiles uses mobile data."
             )
-        }
 
-        Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                elevation = CardDefaults.cardElevation(
+                    defaultElevation = 2.dp
+                )
+            ) {
+                SettingSwitchRow(
+                    title = "Data Saver",
+                    description = "Reduce background data usage on limited connections.",
+                    checked = dataSaverEnabled,
+                    onCheckedChange = { enabled ->
 
-        // Data saver setting
-        Text(
-            text = "Data Usage",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+                        dataSaverEnabled = enabled
 
-        Spacer(modifier = Modifier.height(8.dp))
+                        preferences.edit()
+                            .putBoolean(
+                                "data_saver_enabled",
+                                enabled
+                            )
+                            .apply()
+                    }
+                )
+            }
 
-        Card(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            SettingSwitchRow(
-                title = "Data Saver",
-                description = "Reduce background data usage on limited connections.",
-                checked = dataSaverEnabled,
-                onCheckedChange = { enabled ->
+            Spacer(modifier = Modifier.height(28.dp))
 
-                    dataSaverEnabled = enabled
+            // Small app information section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = SettingsDarkBlue
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp)
+                ) {
+                    Text(
+                        text = "LocalMiles",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
 
-                    preferences.edit()
-                        .putBoolean("data_saver_enabled", enabled)
-                        .apply()
+                    Text(
+                        text = "Deliver locally. Drive further.",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Secure • Reliable • Connected",
+                        color = SettingsGreen,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-            )
+            }
         }
     }
 }
 
-// Displays one selectable language optionn
+@Composable
+private fun SettingsSectionTitle(
+    title: String,
+    description: String
+) {
+    Text(
+        text = title,
+        color = SettingsDarkBlue,
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Bold
+    )
+
+    Text(
+        text = description,
+        color = SettingsGrey,
+        fontSize = 12.sp
+    )
+}
+
 @Composable
 private fun LanguageOption(
     language: String,
@@ -210,22 +333,38 @@ private fun LanguageOption(
     onSelected: () -> Unit
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                onSelected()
+            }
+            .padding(
+                horizontal = 12.dp,
+                vertical = 6.dp
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
 
         RadioButton(
             selected = selectedLanguage == language,
-            onClick = onSelected
+            onClick = onSelected,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = SettingsGreen
+            )
         )
 
         Text(
             text = language,
-            style = MaterialTheme.typography.bodyLarge
+            color = SettingsDarkBlue,
+            fontSize = 15.sp,
+            fontWeight = if (selectedLanguage == language) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Normal
+            }
         )
     }
 }
-
 
 @Composable
 private fun SettingSwitchRow(
@@ -243,24 +382,36 @@ private fun SettingSwitchRow(
     ) {
 
         Column(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp)
         ) {
 
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                color = SettingsDarkBlue,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
 
+            Spacer(modifier = Modifier.height(3.dp))
+
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodySmall
+                color = SettingsGrey,
+                fontSize = 12.sp
             )
         }
 
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = SettingsGreen,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = SettingsGrey
+            )
         )
     }
 }

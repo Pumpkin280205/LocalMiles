@@ -1,6 +1,8 @@
 package com.example.localmiles.Screens.Client
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,13 +10,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,11 +32,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.localmiles.Core.Network.Dto.StopResponse
 
-// Displays tracking information for a delivery selected from the client dashboard
+// LocalMiles colours based on the project mock-up
+private val LocalMilesDarkBlue = Color(0xFF004759)
+private val LocalMilesGreen = Color(0xFF018B58)
+private val LocalMilesLime = Color(0xFF8AC237)
+private val LocalMilesOrange = Color(0xFFF28800)
+private val LocalMilesBackground = Color(0xFFF7F8F9)
+private val LocalMilesGrey = Color(0xFF6E7478)
+private val LocalMilesLightGrey = Color(0xFFE9ECEF)
+
 @Composable
 fun TrackShipmentScreen(
     jobId: Long,
@@ -36,7 +55,6 @@ fun TrackShipmentScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Loads the selected delivery and its stops when the screen opens
     LaunchedEffect(jobId) {
         viewModel.loadShipmentTracking(jobId)
     }
@@ -44,251 +62,625 @@ fun TrackShipmentScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(LocalMilesBackground)
     ) {
 
-        // Allows the client to return to the dashboard
-        TextButton(
-            onClick = onBack
+        // Top app bar
+        Surface(
+            color = LocalMilesDarkBlue,
+            shadowElevation = 4.dp
         ) {
-            Text("Back")
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onBack) {
+                    Text(
+                        text = "‹",
+                        color = Color.White,
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = "Track Shipment",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Delivery #$jobId",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
 
-        Text(
-            text = "Track Shipment",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         when {
-
-            // Display a loading indicator while tracking data is requested
             uiState.isLoading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = LocalMilesGreen
+                    )
+                }
             }
 
-            // Allow the client to retry if the tracking request fails
             uiState.errorMessage != null -> {
-                Text(
-                    text = uiState.errorMessage ?: "Unable to load shipment.",
-                    color = MaterialTheme.colorScheme.error
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = {
-                        viewModel.loadShipmentTracking(jobId)
-                    }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Text("Try Again")
+                    Text(
+                        text = "Unable to load shipment",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = LocalMilesDarkBlue
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = uiState.errorMessage
+                            ?: "Unable to load shipment.",
+                        color = LocalMilesGrey
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            viewModel.loadShipmentTracking(jobId)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LocalMilesGreen
+                        )
+                    ) {
+                        Text("Try Again")
+                    }
                 }
             }
 
             uiState.selectedJob != null -> {
                 val job = uiState.selectedJob!!
 
-                // Summary of the selected delivery.
-                Card(
-                    modifier = Modifier.fillMaxWidth()
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        16.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Delivery #${job.jobId}",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                    item {
 
-                        TrackingDetailRow(
-                            label = "Status",
-                            value = job.status
-                        )
-
-                        TrackingDetailRow(
-                            label = "Priority",
-                            value = job.priority
-                        )
-
-                        TrackingDetailRow(
-                            label = "Scheduled",
-                            value = job.scheduledDate
-                        )
-
-                        job.estimatedDistanceKm?.let { distance ->
-                            TrackingDetailRow(
-                                label = "Estimated distance",
-                                value = "$distance km"
+                        // Shipment status summary
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White
+                            ),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = 2.dp
                             )
-                        }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(18.dp)
+                            ) {
 
-                        job.estimatedDurationMinutes?.let { duration ->
-                            TrackingDetailRow(
-                                label = "Estimated duration",
-                                value = "$duration minutes"
+                                Text(
+                                    text = "Estimated Delivery",
+                                    color = LocalMilesGrey,
+                                    fontSize = 13.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = formatScheduledDate(job.scheduledDate),
+                                    color = LocalMilesGreen,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                StatusPill(job.status)
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = statusMessage(job.status),
+                                    color = LocalMilesGrey,
+                                    fontSize = 14.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(18.dp))
+
+
+                                ShipmentProgress(
+                                    status = job.status
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+
+                        // Delivery details
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.White
+                            ),
+                            elevation = CardDefaults.cardElevation(
+                                defaultElevation = 2.dp
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(18.dp)
+                            ) {
+
+                                Text(
+                                    text = "Delivery Details",
+                                    color = LocalMilesDarkBlue,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                TrackingDetailRow(
+                                    label = "Delivery",
+                                    value = "#${job.jobId}"
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+
+                                TrackingDetailRow(
+                                    label = "Priority",
+                                    value = job.priority
+                                )
+
+                                job.estimatedDistanceKm?.let { distance ->
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+
+                                    TrackingDetailRow(
+                                        label = "Distance",
+                                        value = "$distance km"
+                                    )
+                                }
+
+                                job.estimatedDurationMinutes?.let { duration ->
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+
+                                    TrackingDetailRow(
+                                        label = "Duration",
+                                        value = "$duration min"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.SpaceBetween,
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Stops",
+                                color = LocalMilesDarkBlue,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                text = "${uiState.stops.size} total",
+                                color = LocalMilesGreen,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                    if (uiState.stops.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.White
+                                )
+                            ) {
+                                Text(
+                                    text = "No delivery stops are available for this shipment.",
+                                    modifier = Modifier.padding(18.dp),
+                                    color = LocalMilesGrey
+                                )
+                            }
+                        }
+                    } else {
 
-                Text(
-                    text = "Delivery Progress",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (uiState.stops.isEmpty()) {
-                    Text(
-                        text = "No delivery stops are available for this shipment.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                } else {
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
                         items(
                             items = uiState.stops,
                             key = { stop -> stop.stopId }
                         ) { stop ->
-                            DeliveryStopCard(stop = stop)
+
+                            DeliveryStopCard(
+                                stop = stop
+                            )
                         }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Text(
+                            text = "LocalMiles",
+                            modifier = Modifier.fillMaxWidth(),
+                            color = LocalMilesDarkBlue,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+
+                        Text(
+                            text = "Deliver locally. Drive further.",
+                            color = LocalMilesGrey,
+                            fontSize = 12.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             }
 
             else -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Shipment information is unavailable.",
+                        color = LocalMilesGrey
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(status: String) {
+
+    val colour = when (status.lowercase()) {
+        "completed", "delivered" -> LocalMilesGreen
+        "enroute", "en route", "in progress" -> LocalMilesLime
+        "cancelled", "failed" -> Color(0xFFD9534F)
+        "pending" -> LocalMilesOrange
+        else -> LocalMilesDarkBlue
+    }
+
+    Surface(
+        color = colour,
+        shape = RoundedCornerShape(50.dp)
+    ) {
+        Text(
+            text = formatStatus(status),
+            modifier = Modifier.padding(
+                horizontal = 14.dp,
+                vertical = 6.dp
+            ),
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun ShipmentProgress(status: String) {
+
+    val completedSteps = when (status.lowercase()) {
+        "completed", "delivered" -> 4
+        "enroute", "en route", "in progress" -> 3
+        "assigned" -> 2
+        "pending" -> 1
+        else -> 1
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        for (step in 1..4) {
+
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .background(
+                        color = if (step <= completedSteps)
+                            LocalMilesGreen
+                        else
+                            LocalMilesLightGrey,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "Shipment information is unavailable.",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = if (step <= completedSteps) "✓" else "$step",
+                    color = if (step <= completedSteps)
+                        Color.White
+                    else
+                        LocalMilesGrey,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (step < 4) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(3.dp)
+                        .background(
+                            if (step < completedSteps)
+                                LocalMilesGreen
+                            else
+                                LocalMilesLightGrey
+                        )
                 )
             }
         }
     }
 }
 
-// Displays a label and value in the shipment summary
 @Composable
 private fun TrackingDetailRow(
     label: String,
     value: String
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 3.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            fontWeight = FontWeight.SemiBold
+            color = LocalMilesGrey,
+            fontSize = 14.sp
         )
 
-        Text(text = value)
+        Text(
+            text = value,
+            color = LocalMilesDarkBlue,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 14.sp
+        )
     }
 }
 
-// Displays one stop in the shipment's delivery sequence
 @Composable
 private fun DeliveryStopCard(
     stop: StopResponse
 ) {
+
+    val statusColour = when (stop.status.lowercase()) {
+        "completed", "delivered" -> LocalMilesGreen
+        "enroute", "en route", "in progress" -> LocalMilesLime
+        "cancelled", "failed" -> Color(0xFFD9534F)
+        "pending" -> LocalMilesOrange
+        else -> LocalMilesDarkBlue
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top
         ) {
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Numbered stop marker
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(
+                        statusColour,
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Stop ${stop.sequenceNumber}",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = stop.sequenceNumber.toString(),
+                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
-
-                Text(
-                    text = stop.status,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            HorizontalDivider()
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = stop.recipientName,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Text(
-                text = stop.address,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            // Displays the delivery window only when it was supplied by the API
-            if (
-                stop.deliveryWindowStart != null ||
-                stop.deliveryWindowEnd != null
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp)
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween
+                ) {
+
+                    Text(
+                        text = stop.recipientName,
+                        modifier = Modifier.weight(1f),
+                        color = LocalMilesDarkBlue,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = formatStatus(stop.status),
+                        color = statusColour,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Delivery Window",
-                    fontWeight = FontWeight.SemiBold
+                    text = stop.address,
+                    color = LocalMilesGrey,
+                    fontSize = 13.sp
                 )
 
-                Text(
-                    text = "${stop.deliveryWindowStart ?: "Not specified"} - " +
-                            (stop.deliveryWindowEnd ?: "Not specified")
-                )
-            }
+                if (
+                    stop.deliveryWindowStart != null ||
+                    stop.deliveryWindowEnd != null
+                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
 
-            // Special delivery instructions are optional
-            stop.instructions?.takeIf { it.isNotBlank() }?.let { instructions ->
-                Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Delivery window: ${
+                            stop.deliveryWindowStart ?: "N/A"
+                        } - ${
+                            stop.deliveryWindowEnd ?: "N/A"
+                        }",
+                        color = LocalMilesGrey,
+                        fontSize = 12.sp
+                    )
+                }
 
-                Text(
-                    text = "Instructions",
-                    fontWeight = FontWeight.SemiBold
-                )
+                stop.instructions
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { instructions ->
 
-                Text(text = instructions)
-            }
+                        Spacer(modifier = Modifier.height(8.dp))
 
-            stop.arrivedAt?.let { arrived ->
-                Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Instructions",
+                            color = LocalMilesDarkBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                Text(
-                    text = "Arrived: $arrived",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+                        Text(
+                            text = instructions,
+                            color = LocalMilesGrey,
+                            fontSize = 12.sp
+                        )
+                    }
 
-            stop.completedAt?.let { completed ->
-                Text(
-                    text = "Completed: $completed",
-                    style = MaterialTheme.typography.bodySmall
-                )
+                stop.arrivedAt?.let { arrived ->
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Arrived: ${formatDateTime(arrived)}",
+                        color = LocalMilesGrey,
+                        fontSize = 11.sp
+                    )
+                }
+
+                stop.completedAt?.let { completed ->
+                    Text(
+                        text = "Completed: ${formatDateTime(completed)}",
+                        color = LocalMilesGreen,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
+    }
+}
+
+private fun formatStatus(status: String): String {
+    return when (status.lowercase()) {
+        "enroute" -> "En Route"
+        "inprogress" -> "In Progress"
+        else -> status
+            .replace("_", " ")
+            .replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase() else it.toString()
+            }
+    }
+}
+
+private fun statusMessage(status: String): String {
+    return when (status.lowercase()) {
+        "completed", "delivered" ->
+            "Your delivery has been completed."
+
+        "enroute", "en route", "in progress" ->
+            "Your delivery is on the way."
+
+        "cancelled" ->
+            "This delivery has been cancelled."
+
+        "pending" ->
+            "Your delivery is being prepared."
+
+        else ->
+            "Follow your delivery progress below."
+    }
+}
+
+private fun formatScheduledDate(value: String): String {
+    if (value.isBlank()) return "To be confirmed"
+
+    return try {
+        val clean = value
+            .replace("T", " ")
+            .replace("Z", "")
+
+        val parts = clean.split(" ")
+
+        if (parts.size >= 2) {
+            "${parts[0]}  ${parts[1].take(5)}"
+        } else {
+            clean
+        }
+    } catch (_: Exception) {
+        value
+    }
+}
+
+private fun formatDateTime(value: String): String {
+    return try {
+        value
+            .replace("T", " ")
+            .replace("Z", "")
+            .take(16)
+    } catch (_: Exception) {
+        value
     }
 }
