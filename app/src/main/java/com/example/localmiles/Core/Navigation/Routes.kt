@@ -29,6 +29,9 @@ object Routes {
 
     const val DISPATCHER_USERS = "dispatcher/users"
 
+    // Dispatcher account settings
+    const val DISPATCHER_SETTINGS = "dispatcher/settings"
+
 
     // ============================================================
     // DRIVER ROUTES

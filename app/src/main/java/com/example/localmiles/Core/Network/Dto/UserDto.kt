@@ -7,8 +7,10 @@ data class UserAccountResponse(
     @SerializedName("Email") val email: String,
     @SerializedName("FirstName") val firstName: String,
     @SerializedName("LastName") val lastName: String,
-    //"admin" | "driver" | "client"
+
+    // "admin" | "driver" | "client"
     @SerializedName("Role") val role: String,
+
     @SerializedName("IsActive") val isActive: Boolean,
     @SerializedName("CreatedAt") val createdAt: String,
     @SerializedName("LastLoginAt") val lastLoginAt: String?,
@@ -24,4 +26,16 @@ data class UserDetailResponse(
 
 data class UserRoleUpdateRequest(
     @SerializedName("Role") val role: String,
+)
+
+/**
+ * Request used by the logged-in user to update
+ * their own profile.
+ *
+ * The backend allows FirstName and LastName to be
+ * changed through PATCH /users/me.
+ */
+data class UserProfileUpdateRequest(
+    @SerializedName("FirstName") val firstName: String,
+    @SerializedName("LastName") val lastName: String,
 )

@@ -8,30 +8,25 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import com.example.localmiles.Core.Data.Repository.UserRepository
-import com.example.localmiles.Screens.Dispatcher.UserManagementScreen
-import com.example.localmiles.Screens.Dispatcher.UserManagementViewModel
-import com.example.localmiles.Screens.Dispatcher.UserManagementViewModelFactory
-import com.example.localmiles.Core.Network.RetrofitClient
-import com.example.localmiles.Screens.Dispatcher.DispatcherViewModel
-import com.example.localmiles.Screens.Dispatcher.DispatcherViewModelFactory
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 
 import com.example.localmiles.Core.Data.Repository.JobRepository
+import com.example.localmiles.Core.Data.Repository.UserRepository
+import com.example.localmiles.Core.Network.RetrofitClient
 import com.example.localmiles.Core.Utils.SessionManager
 
 import com.example.localmiles.Screens.Auth.AuthViewModel
@@ -44,18 +39,26 @@ import com.example.localmiles.Screens.Client.ClientViewModelFactory
 import com.example.localmiles.Screens.Client.SettingsScreen
 import com.example.localmiles.Screens.Client.TrackShipmentScreen
 
+import com.example.localmiles.Screens.Dispatcher.CreateJobScreen
+import com.example.localmiles.Screens.Dispatcher.DashboardScreen
+import com.example.localmiles.Screens.Dispatcher.DeliveryHistoryScreen
+import com.example.localmiles.Screens.Dispatcher.DispatcherSettingsScreen
+import com.example.localmiles.Screens.Dispatcher.DispatcherSettingsViewModel
+import com.example.localmiles.Screens.Dispatcher.DispatcherSettingsViewModelFactory
+import com.example.localmiles.Screens.Dispatcher.DispatcherViewModel
+import com.example.localmiles.Screens.Dispatcher.DispatcherViewModelFactory
+import com.example.localmiles.Screens.Dispatcher.FleetManagementScreen
+import com.example.localmiles.Screens.Dispatcher.JobListScreen
+import com.example.localmiles.Screens.Dispatcher.LiveMapScreen
+import com.example.localmiles.Screens.Dispatcher.UserManagementScreen
+import com.example.localmiles.Screens.Dispatcher.UserManagementViewModel
+import com.example.localmiles.Screens.Dispatcher.UserManagementViewModelFactory
+
 import com.example.localmiles.Screens.Driver.DriverDashboardScreen
 import com.example.localmiles.Screens.Driver.DriverViewModel
 import com.example.localmiles.Screens.Driver.MyJobsScreen
 import com.example.localmiles.Screens.Driver.PodCaptureScreen
 import com.example.localmiles.Screens.Driver.StopDetailsScreen
-
-import com.example.localmiles.Screens.Dispatcher.CreateJobScreen
-import com.example.localmiles.Screens.Dispatcher.DashboardScreen
-import com.example.localmiles.Screens.Dispatcher.DeliveryHistoryScreen
-import com.example.localmiles.Screens.Dispatcher.FleetManagementScreen
-import com.example.localmiles.Screens.Dispatcher.JobListScreen
-import com.example.localmiles.Screens.Dispatcher.LiveMapScreen
 
 
 @Composable
@@ -80,7 +83,6 @@ fun NavGraph(
                 }
             )
         }
-
 
         composable(Routes.LOGIN) {
 
@@ -130,28 +132,148 @@ fun NavGraph(
 
             DashboardScreen(
 
+                // ------------------------------------------------
+                // REAL API DATA FOR DASHBOARD CARDS
+                // ------------------------------------------------
+
+                activeJobsCount = dispatcherUiState.jobs.count { job ->
+                    !job.status.equals(
+                        "Completed",
+                        ignoreCase = true
+                    ) &&
+                            !job.status.equals(
+                                "Cancelled",
+                                ignoreCase = true
+                            )
+                },
+
+                driversCount = dispatcherUiState.drivers.count { driver ->
+                    driver.isActive
+                },
+
+                inTransitCount = dispatcherUiState.jobs.count { job ->
+                    job.status.equals(
+                        "EnRoute",
+                        ignoreCase = true
+                    )
+                },
+
+                issuesCount = dispatcherUiState.jobs.count { job ->
+                    job.status.equals(
+                        "Cancelled",
+                        ignoreCase = true
+                    )
+                },
+
+                // ------------------------------------------------
+                // DASHBOARD NAVIGATION
+                // ------------------------------------------------
+
                 onJobsClick = {
-                    nav.navigate(Routes.DISPATCHER_JOBS)
+                    nav.navigate(
+                        Routes.DISPATCHER_JOBS
+                    )
                 },
 
                 onFleetClick = {
-                    nav.navigate(Routes.DISPATCHER_FLEET)
+                    nav.navigate(
+                        Routes.DISPATCHER_FLEET
+                    )
                 },
 
                 onMapClick = {
-                    nav.navigate(Routes.DISPATCHER_LIVE_MAP)
+                    nav.navigate(
+                        Routes.DISPATCHER_LIVE_MAP
+                    )
                 },
 
                 onHistoryClick = {
-                    nav.navigate(Routes.DISPATCHER_HISTORY)
+                    nav.navigate(
+                        Routes.DISPATCHER_HISTORY
+                    )
                 },
 
                 onUsersClick = {
-                    nav.navigate(Routes.DISPATCHER_USERS)
+                    nav.navigate(
+                        Routes.DISPATCHER_USERS
+                    )
                 },
+
+                // ------------------------------------------------
+                // DISPATCHER SETTINGS
+                // ------------------------------------------------
+
+                onSettingsClick = {
+                    nav.navigate(
+                        Routes.DISPATCHER_SETTINGS
+                    )
+                },
+
+                // ------------------------------------------------
+                // DISPATCHER LOGOUT
+                // ------------------------------------------------
+
+                onLogout = {
+
+                    // Clear the saved authentication token,
+                    // user ID and role.
+                    sessionManager.clear()
+
+                    // Return to login and remove the
+                    // previous navigation history.
+                    nav.navigate(
+                        Routes.LOGIN
+                    ) {
+
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+
+                        launchSingleTop = true
+                    }
+                },
+
+                // ------------------------------------------------
+                // REFRESH
+                // ------------------------------------------------
 
                 onRefresh = {
                     dispatcherViewModel.loadDispatcherData()
+                }
+            )
+        }
+
+
+        // ========================================================
+        // DISPATCHER - SETTINGS
+        // ========================================================
+
+        composable(Routes.DISPATCHER_SETTINGS) {
+
+            val context = LocalContext.current
+
+            val sessionManager = remember {
+                SessionManager(context)
+            }
+
+            val userRepository = remember {
+                UserRepository(
+                    session = sessionManager
+                )
+            }
+
+            val settingsViewModel: DispatcherSettingsViewModel =
+                viewModel(
+                    factory = DispatcherSettingsViewModelFactory(
+                        userRepository = userRepository
+                    )
+                )
+
+            DispatcherSettingsScreen(
+                viewModel = settingsViewModel,
+
+                onBack = {
+                    nav.popBackStack()
                 }
             )
         }
@@ -211,6 +333,11 @@ fun NavGraph(
             )
         }
 
+
+        // ========================================================
+        // DISPATCHER - EDIT JOB
+        // ========================================================
+
         composable(
             route = Routes.DISPATCHER_EDIT_JOB,
             arguments = listOf(
@@ -249,7 +376,6 @@ fun NavGraph(
             )
 
             CreateJobScreen(
-
                 viewModel = dispatcherViewModel,
 
                 jobId = jobId,
@@ -296,7 +422,6 @@ fun NavGraph(
             )
 
             CreateJobScreen(
-
                 viewModel = dispatcherViewModel,
 
                 jobId = null,
@@ -317,9 +442,17 @@ fun NavGraph(
         // ========================================================
 
         composable(Routes.DISPATCHER_FLEET) {
+
             val context = LocalContext.current
-            val sessionManager = remember { SessionManager(context) }
-            val apiService = remember { RetrofitClient.getApiService(sessionManager) }
+
+            val sessionManager = remember {
+                SessionManager(context)
+            }
+
+            val apiService = remember {
+                RetrofitClient.getApiService(sessionManager)
+            }
+
             val jobRepository = remember {
                 JobRepository(
                     session = sessionManager,
@@ -336,6 +469,7 @@ fun NavGraph(
 
             FleetManagementScreen(
                 viewModel = dispatcherViewModel,
+
                 onBack = {
                     nav.popBackStack()
                 }
@@ -348,9 +482,17 @@ fun NavGraph(
         // ========================================================
 
         composable(Routes.DISPATCHER_LIVE_MAP) {
+
             val context = LocalContext.current
-            val sessionManager = remember { SessionManager(context) }
-            val apiService = remember { RetrofitClient.getApiService(sessionManager) }
+
+            val sessionManager = remember {
+                SessionManager(context)
+            }
+
+            val apiService = remember {
+                RetrofitClient.getApiService(sessionManager)
+            }
+
             val jobRepository = remember {
                 JobRepository(
                     session = sessionManager,
@@ -367,6 +509,7 @@ fun NavGraph(
 
             LiveMapScreen(
                 viewModel = dispatcherViewModel,
+
                 onBack = {
                     nav.popBackStack()
                 }
@@ -379,9 +522,17 @@ fun NavGraph(
         // ========================================================
 
         composable(Routes.DISPATCHER_HISTORY) {
+
             val context = LocalContext.current
-            val sessionManager = remember { SessionManager(context) }
-            val apiService = remember { RetrofitClient.getApiService(sessionManager) }
+
+            val sessionManager = remember {
+                SessionManager(context)
+            }
+
+            val apiService = remember {
+                RetrofitClient.getApiService(sessionManager)
+            }
+
             val jobRepository = remember {
                 JobRepository(
                     session = sessionManager,
@@ -398,6 +549,7 @@ fun NavGraph(
 
             DeliveryHistoryScreen(
                 viewModel = dispatcherViewModel,
+
                 onBack = {
                     nav.popBackStack()
                 }
@@ -413,16 +565,18 @@ fun NavGraph(
 
             val context = LocalContext.current
 
-            val userManagementViewModel: UserManagementViewModel = viewModel(
-                factory = UserManagementViewModelFactory(
-                    userRepository = UserRepository(
-                        session = SessionManager(context)
+            val userManagementViewModel: UserManagementViewModel =
+                viewModel(
+                    factory = UserManagementViewModelFactory(
+                        userRepository = UserRepository(
+                            session = SessionManager(context)
+                        )
                     )
                 )
-            )
 
             UserManagementScreen(
                 viewModel = userManagementViewModel,
+
                 onBack = {
                     nav.popBackStack()
                 }
@@ -441,14 +595,18 @@ fun NavGraph(
             DriverDashboardScreen(
 
                 onViewJobs = {
-                    nav.navigate(Routes.DRIVER_MY_JOBS)
+                    nav.navigate(
+                        Routes.DRIVER_MY_JOBS
+                    )
                 },
 
                 onLogout = {
 
                     authViewModel.logout()
 
-                    nav.navigate(Routes.LOGIN) {
+                    nav.navigate(
+                        Routes.LOGIN
+                    ) {
 
                         popUpTo(0) {
                             inclusive = true
@@ -480,6 +638,10 @@ fun NavGraph(
             )
         }
 
+
+        // ========================================================
+        // DRIVER - STOP DETAILS
+        // ========================================================
 
         composable(
             route = Routes.DRIVER_JOB_STOPS,
@@ -518,6 +680,10 @@ fun NavGraph(
             )
         }
 
+
+        // ========================================================
+        // DRIVER - POD CAPTURE
+        // ========================================================
 
         composable(
             route = Routes.DRIVER_CAPTURE_POD,
@@ -570,13 +736,14 @@ fun NavGraph(
 
             val context = LocalContext.current
 
-            val clientViewModel: ClientViewModel = viewModel(
-                factory = ClientViewModelFactory(
-                    jobRepository = JobRepository(
-                        session = SessionManager(context)
+            val clientViewModel: ClientViewModel =
+                viewModel(
+                    factory = ClientViewModelFactory(
+                        jobRepository = JobRepository(
+                            session = SessionManager(context)
+                        )
                     )
                 )
-            )
 
             val authViewModel: AuthViewModel = viewModel()
 
@@ -602,7 +769,9 @@ fun NavGraph(
 
                     authViewModel.logout()
 
-                    nav.navigate(Routes.LOGIN) {
+                    nav.navigate(
+                        Routes.LOGIN
+                    ) {
 
                         popUpTo(0) {
                             inclusive = true
@@ -619,7 +788,6 @@ fun NavGraph(
         // CLIENT - TRACK SHIPMENT
         // ========================================================
 
-
         composable(
             route = Routes.CLIENT_TRACK_SHIPMENT,
             arguments = listOf(
@@ -635,13 +803,14 @@ fun NavGraph(
                 backStackEntry.arguments?.getLong("jobId")
                     ?: return@composable
 
-            val clientViewModel: ClientViewModel = viewModel(
-                factory = ClientViewModelFactory(
-                    jobRepository = JobRepository(
-                        session = SessionManager(context)
+            val clientViewModel: ClientViewModel =
+                viewModel(
+                    factory = ClientViewModelFactory(
+                        jobRepository = JobRepository(
+                            session = SessionManager(context)
+                        )
                     )
                 )
-            )
 
             TrackShipmentScreen(
 

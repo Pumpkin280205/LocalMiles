@@ -13,22 +13,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,13 +47,28 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
+    activeJobsCount: Int = 0,
+    driversCount: Int = 0,
+    inTransitCount: Int = 0,
+    issuesCount: Int = 0,
     onJobsClick: () -> Unit = {},
     onFleetClick: () -> Unit = {},
     onMapClick: () -> Unit = {},
     onHistoryClick: () -> Unit = {},
     onUsersClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onRefresh: () -> Unit = {}
 ) {
+
+    var accountMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+    var showLogoutDialog by remember {
+        mutableStateOf(false)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -61,7 +85,13 @@ fun DashboardScreen(
                         )
                     }
                 },
+
                 actions = {
+
+                    // ------------------------------------------------
+                    // Refresh button
+                    // ------------------------------------------------
+
                     IconButton(
                         onClick = onRefresh
                     ) {
@@ -69,6 +99,56 @@ fun DashboardScreen(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh"
                         )
+                    }
+
+                    // ------------------------------------------------
+                    // Dispatcher account button
+                    // ------------------------------------------------
+
+                    Box {
+
+                        IconButton(
+                            onClick = {
+                                accountMenuExpanded = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountCircle,
+                                contentDescription = "Account"
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = accountMenuExpanded,
+                            onDismissRequest = {
+                                accountMenuExpanded = false
+                            }
+                        ) {
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text("Settings")
+                                },
+                                onClick = {
+
+                                    accountMenuExpanded = false
+
+                                    onSettingsClick()
+                                }
+                            )
+
+                            DropdownMenuItem(
+                                text = {
+                                    Text("Logout")
+                                },
+                                onClick = {
+
+                                    accountMenuExpanded = false
+
+                                    showLogoutDialog = true
+                                }
+                            )
+                        }
                     }
                 }
             )
@@ -79,9 +159,17 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(
+                    horizontal = 16.dp,
+                    vertical = 12.dp
+                ),
+
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+
+            // ========================================================
+            // OVERVIEW
+            // ========================================================
 
             Text(
                 text = "Overview",
@@ -97,14 +185,14 @@ fun DashboardScreen(
                 DashboardStatCard(
                     modifier = Modifier.weight(1f),
                     title = "Active Jobs",
-                    value = "12",
+                    value = activeJobsCount.toString(),
                     icon = Icons.Default.Assignment
                 )
 
                 DashboardStatCard(
                     modifier = Modifier.weight(1f),
                     title = "Drivers",
-                    value = "8",
+                    value = driversCount.toString(),
                     icon = Icons.Default.DirectionsCar
                 )
             }
@@ -117,14 +205,14 @@ fun DashboardScreen(
                 DashboardStatCard(
                     modifier = Modifier.weight(1f),
                     title = "In Transit",
-                    value = "7",
+                    value = inTransitCount.toString(),
                     icon = Icons.Default.Map
                 )
 
                 DashboardStatCard(
                     modifier = Modifier.weight(1f),
                     title = "Issues",
-                    value = "2",
+                    value = issuesCount.toString(),
                     icon = Icons.Default.Warning
                 )
             }
@@ -132,6 +220,10 @@ fun DashboardScreen(
             Spacer(
                 modifier = Modifier.height(4.dp)
             )
+
+            // ========================================================
+            // DISPATCHER TOOLS
+            // ========================================================
 
             Text(
                 text = "Dispatcher Tools",
@@ -175,6 +267,56 @@ fun DashboardScreen(
             )
         }
     }
+
+    // ============================================================
+    // LOGOUT CONFIRMATION
+    // ============================================================
+
+    if (showLogoutDialog) {
+
+        AlertDialog(
+            onDismissRequest = {
+                showLogoutDialog = false
+            },
+
+            title = {
+                Text(
+                    text = "Logout"
+                )
+            },
+
+            text = {
+                Text(
+                    text = "Are you sure you want to logout?"
+                )
+            },
+
+            confirmButton = {
+
+                TextButton(
+                    onClick = {
+
+                        showLogoutDialog = false
+
+                        onLogout()
+                    }
+                ) {
+                    Text("Logout")
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                    }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -184,6 +326,7 @@ private fun DashboardStatCard(
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
@@ -191,10 +334,12 @@ private fun DashboardStatCard(
             defaultElevation = 2.dp
         )
     ) {
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
+
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
 
@@ -225,6 +370,7 @@ private fun DashboardActionCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit
 ) {
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -233,11 +379,14 @@ private fun DashboardActionCard(
             defaultElevation = 2.dp
         )
     ) {
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
+
             verticalAlignment = Alignment.CenterVertically,
+
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
@@ -248,8 +397,10 @@ private fun DashboardActionCard(
                         color = MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(12.dp)
                     ),
+
                 contentAlignment = Alignment.Center
             ) {
+
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
