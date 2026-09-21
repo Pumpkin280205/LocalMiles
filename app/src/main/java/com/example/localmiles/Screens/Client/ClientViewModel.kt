@@ -43,6 +43,7 @@ class ClientViewModel(
 
                 is Result.Success -> {
                     Log.d("ClientViewModel", "Client jobs loaded: ${result.data.size}")
+                    println("CLIENT JOBS LOADED: ${result.data.size}")
 
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,

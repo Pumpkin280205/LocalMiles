@@ -38,6 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.localmiles.Core.Utils.ThemeMode
 import com.example.localmiles.Core.Utils.ThemePreferences
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.statusBarsPadding
+
+// Settings available to LocalMiles clients.
 
 @Composable
 fun SettingsScreen(
@@ -115,6 +119,16 @@ fun SettingsScreen(
                     )
                 }
             }
+            .statusBarsPadding()
+            .padding(16.dp)
+    ) {
+
+        // Return to the client dashboard.
+        Button(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Back to Dashboard")
         }
 
         Column(

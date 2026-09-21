@@ -10,6 +10,9 @@ import com.example.localmiles.Core.Network.Dto.DriverUpsertRequest
 import com.example.localmiles.Core.Network.Dto.UserAccountResponse
 import com.example.localmiles.Core.Utils.Result
 import com.example.localmiles.Core.Utils.Role
+import com.example.localmiles.Core.Data.Repository.UserRepository
+import com.example.localmiles.Core.Network.Dto.UserAccountResponse
+import com.example.localmiles.Core.Utils.Result
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,6 +71,7 @@ class UserManagementViewModel(
             return
         }
 
+    fun setRole(userId: Long, role: String) {
         if (_uiState.value.updatingUserId != null) return
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(updatingUserId = userId, errorMessage = null)

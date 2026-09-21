@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.localmiles.Core.Network.JobResponse
@@ -100,6 +101,67 @@ fun ClientDashboardScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
         ) {
+            .statusBarsPadding()
+            .padding(16.dp)
+    ) {
+
+        // Dashboard heading and client account actions
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "My Deliveries",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Text(
+                    text = "Track and manage your shipments",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            // Client account actions
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                TextButton(
+                    onClick = onOpenSettings
+                ) {
+                    Text("Settings")
+                }
+
+                TextButton(
+                    onClick = onLogout
+                ) {
+                    Text("Log out")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        when {
+
+            // Shows a progress indicator while jobs are being requested
+            uiState.isLoading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+
+            // Shows an error message and allows the client to retry
+            uiState.errorMessage != null -> {
+                Text(
+                    text = uiState.errorMessage ?: "Unable to load deliveries.",
+                    color = MaterialTheme.colorScheme.error
+                )
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -110,6 +172,10 @@ fun ClientDashboardScreen(
             ) {
                 Column(
                     modifier = Modifier.weight(1f)
+                Button(
+                    onClick = {
+                        viewModel.loadClientJobs()
+                    }
                 ) {
                     Text(
                         text = "My Deliveries",
@@ -151,6 +217,12 @@ fun ClientDashboardScreen(
                         )
                     }
                 }
+            // Empty state when the client has no deliveries
+            uiState.jobs.isEmpty() -> {
+                Text(
+                    text = "No deliveries found.",
+                    style = MaterialTheme.typography.titleMedium
+                )
 
                 uiState.errorMessage != null -> {
                     ErrorCard(
@@ -191,6 +263,19 @@ fun ClientDashboardScreen(
                         item {
                             Spacer(modifier = Modifier.height(20.dp))
                         }
+            // Display deliveries returned for the authenticated client
+            else -> {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(
+                        items = uiState.jobs,
+                        key = { job -> job.jobId }
+                    ) { job ->
+                        ClientDeliveryCard(
+                            job = job,
+                            onTrackShipment = onTrackShipment
+                        )
                     }
                 }
             }
@@ -216,6 +301,12 @@ private fun ClientDeliveryCard(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
+
+            Text(
+                text = "Delivery #${job.jobId}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -393,6 +484,12 @@ private fun EmptyDeliveriesCard() {
     }
 }
 
+        }
+    }
+}
+
+// Preview used only during development
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun ErrorCard(
     message: String,
