@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import com.example.localmiles.Core.Network.Dto.StopResponse
+import android.util.Log
 
 // Represents all the information needed by the client screens
 data class ClientDashboardUiState(
@@ -41,7 +42,7 @@ class ClientViewModel(
             when (val result = jobRepository.getJobs(mine = true)) {
 
                 is Result.Success -> {
-                    println("CLIENT JOBS LOADED: ${result.data.size}")
+                    Log.d("ClientViewModel", "Client jobs loaded: ${result.data.size}")
 
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
