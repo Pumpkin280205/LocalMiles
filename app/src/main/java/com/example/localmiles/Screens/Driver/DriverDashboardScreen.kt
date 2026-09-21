@@ -11,6 +11,7 @@ import com.example.localmiles.Common.Components.AppTopBar
 @Composable
 fun DriverDashboardScreen(
     onViewJobs: () -> Unit,
+    onSettings: () -> Unit,
     onLogout: () -> Unit
 ) {
     Scaffold(
@@ -36,6 +37,13 @@ fun DriverDashboardScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("My Jobs")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onSettings,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Settings")
             }
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedButton(

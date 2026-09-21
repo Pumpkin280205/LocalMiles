@@ -1,6 +1,8 @@
 package com.example.localmiles.Screens.Client
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,13 +10,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,9 +36,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.localmiles.Core.Network.JobResponse
 
-// Main dashboard displayed after a client successfully logs in
 @Composable
 fun ClientDashboardScreen(
     viewModel: ClientViewModel,
@@ -38,7 +48,6 @@ fun ClientDashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Load the authenticated client's deliveries when the screen first opens
     LaunchedEffect(Unit) {
         viewModel.loadClientJobs()
     }
@@ -46,6 +55,52 @@ fun ClientDashboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+
+        // LocalMiles header
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .statusBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "LocalMiles",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Client Dashboard",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                        fontSize = 12.sp
+                    )
+                }
+
+                TextButton(onClick = onOpenSettings) {
+                    Text(
+                        text = "Settings",
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp)
+        ) {
             .statusBarsPadding()
             .padding(16.dp)
     ) {
@@ -108,17 +163,60 @@ fun ClientDashboardScreen(
                     color = MaterialTheme.colorScheme.error
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
                 Button(
                     onClick = {
                         viewModel.loadClientJobs()
                     }
                 ) {
-                    Text("Try Again")
+                    Text(
+                        text = "My Deliveries",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Track your shipments in real time.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                TextButton(onClick = onLogout) {
+                    Text(
+                        text = "Log out",
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
 
+            Spacer(modifier = Modifier.height(18.dp))
+
+            when {
+                uiState.isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             // Empty state when the client has no deliveries
             uiState.jobs.isEmpty() -> {
                 Text(
@@ -126,14 +224,45 @@ fun ClientDashboardScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                uiState.errorMessage != null -> {
+                    ErrorCard(
+                        message = uiState.errorMessage
+                            ?: "Unable to load deliveries.",
+                        onRetry = {
+                            viewModel.loadClientJobs()
+                        }
+                    )
+                }
 
-                Text(
-                    text = "Your assigned shipments will appear here.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+                uiState.jobs.isEmpty() -> {
+                    EmptyDeliveriesCard()
+                }
 
+                else -> {
+                    Text(
+                        text = "${uiState.jobs.size} shipments",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(
+                            items = uiState.jobs,
+                            key = { job -> job.jobId }
+                        ) { job ->
+                            ClientDeliveryCard(
+                                job = job,
+                                onTrackShipment = onTrackShipment
+                            )
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(20.dp))
+                        }
             // Display deliveries returned for the authenticated client
             else -> {
                 LazyColumn(
@@ -154,14 +283,20 @@ fun ClientDashboardScreen(
     }
 }
 
-// Displays a summary of one delivery on the client dashboard
 @Composable
 private fun ClientDeliveryCard(
     job: JobResponse,
     onTrackShipment: (Long) -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -173,46 +308,182 @@ private fun ClientDeliveryCard(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Status: ${job.status}",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-            Text(
-                text = "Priority: ${job.priority}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Text(
-                text = "Scheduled: ${job.scheduledDate}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            job.estimatedDistanceKm?.let { distance ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Estimated distance: $distance km",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "Delivery #${job.jobId}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            }
 
-            job.estimatedDurationMinutes?.let { duration ->
-                Text(
-                    text = "Estimated duration: $duration minutes",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                StatusBadge(status = job.status)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            DeliveryInformationRow(
+                label = "Scheduled",
+                value = formatDate(job.scheduledDate)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            DeliveryInformationRow(
+                label = "Priority",
+                value = formatStatus(job.priority)
+            )
+
+            job.estimatedDistanceKm?.let { distance ->
+                Spacer(modifier = Modifier.height(8.dp))
+
+                DeliveryInformationRow(
+                    label = "Distance",
+                    value = "$distance km"
+                )
+            }
+
+            job.estimatedDurationMinutes?.let { duration ->
+                Spacer(modifier = Modifier.height(8.dp))
+
+                DeliveryInformationRow(
+                    label = "Estimated time",
+                    value = "$duration min"
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Button(
                 onClick = {
                     onTrackShipment(job.jobId)
-                }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
-                Text("Track Shipment")
+                Text(
+                    text = "Track Shipment",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun DeliveryInformationRow(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun StatusBadge(
+    status: String
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    val (backgroundColor, contentColor) = when (status.lowercase()) {
+        "completed", "delivered" -> colorScheme.primary to colorScheme.onPrimary
+        "enroute", "en route", "inprogress", "in progress" -> colorScheme.secondary to colorScheme.onSecondary
+        "pending" -> colorScheme.tertiary to colorScheme.onTertiary
+        "cancelled", "failed" -> colorScheme.error to colorScheme.onError
+        else -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = backgroundColor
+    ) {
+        Text(
+            text = formatStatus(status),
+            modifier = Modifier.padding(
+                horizontal = 12.dp,
+                vertical = 6.dp
+            ),
+            color = contentColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun EmptyDeliveriesCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = CircleShape
+                    )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "No deliveries yet",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Your assigned shipments will appear here.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
         }
     }
 }
@@ -220,40 +491,62 @@ private fun ClientDeliveryCard(
 // Preview used only during development
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
-private fun ClientDeliveryCardPreview() {
-
-    val sampleJob = JobResponse(
-        jobId = 1001,
-        clientId = 1,
-        driverId = 4,
-        vehicleId = 2,
-        depotId = 1,
-        scheduledDate = "2026-09-15 14:30",
-        status = "EnRoute",
-        priority = "High",
-        notes = "Handle with care",
-        estimatedDistanceKm = 18.5,
-        estimatedDurationMinutes = 35,
-        createdByUserId = 1,
-        createdAt = "2026-09-15 09:00"
-    )
-
-    MaterialTheme {
+private fun ErrorCard(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(20.dp)
         ) {
             Text(
-                text = "My Deliveries",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                text = "Unable to load deliveries",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            ClientDeliveryCard(
-                job = sampleJob,
-                onTrackShipment = {}
-            )
+            OutlinedButton(
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Try Again",
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
+}
+
+// Makes API values  easier to read
+private fun formatStatus(value: String): String {
+    return when (value.lowercase()) {
+        "enroute" -> "En Route"
+        "inprogress" -> "In Progress"
+        else -> value
+    }
+}
+
+// Keeps the API data intact
+private fun formatDate(value: String): String {
+    return value
+        .replace("T", " ")
+        .substringBefore(".")
+        .take(16)
 }

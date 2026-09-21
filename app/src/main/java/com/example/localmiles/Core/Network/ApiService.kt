@@ -28,6 +28,7 @@ import com.example.localmiles.Core.Network.Dto.SyncSubmitResponse
 import com.example.localmiles.Core.Network.Dto.UnreadCountResponse
 import com.example.localmiles.Core.Network.Dto.UserDetailResponse
 import com.example.localmiles.Core.Network.Dto.UserListResponse
+import com.example.localmiles.Core.Network.Dto.UserProfileUpdateRequest
 import com.example.localmiles.Core.Network.Dto.UserRoleUpdateRequest
 import com.example.localmiles.Core.Network.Dto.VehicleDetailResponse
 import com.example.localmiles.Core.Network.Dto.VehicleListResponse
@@ -55,6 +56,22 @@ interface ApiService {
 
     // ----------------------------------------------------------------- Users ---
 
+    // Admin only — every account and its role.
+    @GET("users")
+    suspend fun getUsers(): UserListResponse
+
+    // Admin only — promote/demote a user's role.
+    @PATCH("users/{id}/role")
+    suspend fun updateUserRole(
+        @Path("id") id: Long,
+        @Body body: UserRoleUpdateRequest
+    ): UserDetailResponse
+
+    // Logged-in user — update their own first and last name.
+    @PATCH("users/me")
+    suspend fun updateCurrentUser(
+        @Body body: UserProfileUpdateRequest
+    ): UserDetailResponse
     //admin only — every account and its role.
     @GET("users")
     suspend fun getUsers(): UserListResponse
@@ -66,22 +83,33 @@ interface ApiService {
     // --------------------------------------------------------------- Depots ---
 
     @GET("depots")
-    suspend fun getDepots(@Query("active") active: Boolean? = null): DepotListResponse
+    suspend fun getDepots(
+        @Query("active") active: Boolean? = null
+    ): DepotListResponse
 
     @GET("depots/{id}")
-    suspend fun getDepot(@Path("id") id: Long): DepotDetailResponse
+    suspend fun getDepot(
+        @Path("id") id: Long
+    ): DepotDetailResponse
 
-    // admin only
+    // Admin only.
     @POST("depots")
-    suspend fun createDepot(@Body body: DepotUpsertRequest): DepotDetailResponse
+    suspend fun createDepot(
+        @Body body: DepotUpsertRequest
+    ): DepotDetailResponse
 
-    ///admin only
+    // Admin only.
     @PATCH("depots/{id}")
-    suspend fun updateDepot(@Path("id") id: Long, @Body body: DepotUpsertRequest): DepotDetailResponse
+    suspend fun updateDepot(
+        @Path("id") id: Long,
+        @Body body: DepotUpsertRequest
+    ): DepotDetailResponse
 
-    //admin only — soft delete (IsActive = false); returns the row.
+    // Admin only — soft delete (IsActive = false).
     @DELETE("depots/{id}")
-    suspend fun deactivateDepot(@Path("id") id: Long): DepotDetailResponse
+    suspend fun deactivateDepot(
+        @Path("id") id: Long
+    ): DepotDetailResponse
 
     // -------------------------------------------------------------- Drivers ---
 
@@ -92,24 +120,33 @@ interface ApiService {
         @Query("active") active: Boolean? = null,
     ): DriverListResponse
 
-    //The Driver row linked to the caller's User (HTTP 404 if none).
+    // The Driver row linked to the caller's User.
     @GET("drivers/me")
     suspend fun getMyDriver(): DriverDetailResponse
 
     @GET("drivers/{id}")
-    suspend fun getDriver(@Path("id") id: Long): DriverDetailResponse
+    suspend fun getDriver(
+        @Path("id") id: Long
+    ): DriverDetailResponse
 
-    //admin only
+    // Admin only.
     @POST("drivers")
-    suspend fun createDriver(@Body body: DriverUpsertRequest): DriverDetailResponse
+    suspend fun createDriver(
+        @Body body: DriverUpsertRequest
+    ): DriverDetailResponse
 
-    // admin only
+    // Admin only.
     @PATCH("drivers/{id}")
-    suspend fun updateDriver(@Path("id") id: Long, @Body body: DriverUpsertRequest): DriverDetailResponse
+    suspend fun updateDriver(
+        @Path("id") id: Long,
+        @Body body: DriverUpsertRequest
+    ): DriverDetailResponse
 
-    //admin only — soft delete (IsActive = false).
+    // Admin only — soft delete (IsActive = false).
     @DELETE("drivers/{id}")
-    suspend fun deactivateDriver(@Path("id") id: Long): DriverDetailResponse
+    suspend fun deactivateDriver(
+        @Path("id") id: Long
+    ): DriverDetailResponse
 
     // ------------------------------------------------------------- Vehicles ---
 
@@ -121,19 +158,28 @@ interface ApiService {
     ): VehicleListResponse
 
     @GET("vehicles/{id}")
-    suspend fun getVehicle(@Path("id") id: Long): VehicleDetailResponse
+    suspend fun getVehicle(
+        @Path("id") id: Long
+    ): VehicleDetailResponse
 
-    //admin only
+    // Admin only.
     @POST("vehicles")
-    suspend fun createVehicle(@Body body: VehicleUpsertRequest): VehicleDetailResponse
+    suspend fun createVehicle(
+        @Body body: VehicleUpsertRequest
+    ): VehicleDetailResponse
 
-    //admin only
+    // Admin only.
     @PATCH("vehicles/{id}")
-    suspend fun updateVehicle(@Path("id") id: Long, @Body body: VehicleUpsertRequest): VehicleDetailResponse
+    suspend fun updateVehicle(
+        @Path("id") id: Long,
+        @Body body: VehicleUpsertRequest
+    ): VehicleDetailResponse
 
-    //admin only — soft delete (IsActive = false).
+    // Admin only — soft delete (IsActive = false).
     @DELETE("vehicles/{id}")
-    suspend fun deactivateVehicle(@Path("id") id: Long): VehicleDetailResponse
+    suspend fun deactivateVehicle(
+        @Path("id") id: Long
+    ): VehicleDetailResponse
 
     // ----------------------------------------------------------------- Jobs ---
 
@@ -152,47 +198,74 @@ interface ApiService {
         @Query("offset") offset: Int? = null,
     ): JobListResponse
 
-    //GET jobs/{id} — envelope { job }.
+    // GET jobs/{id} — envelope { job }.
     @GET("jobs/{id}")
-    suspend fun getJob(@Path("id") id: Long): JobDetailResponse
+    suspend fun getJob(
+        @Path("id") id: Long
+    ): JobDetailResponse
 
-    //admin only
+    // Admin only.
     @POST("jobs")
-    suspend fun createJob(@Body body: JobUpsertRequest): JobDetailResponse
+    suspend fun createJob(
+        @Body body: JobUpsertRequest
+    ): JobDetailResponse
 
-    //admin only — full update incl. driver/vehicle assignment.
+    // Admin only — full update incl. driver/vehicle assignment.
     @PATCH("jobs/{id}")
-    suspend fun updateJob(@Path("id") id: Long, @Body body: JobUpsertRequest): JobDetailResponse
+    suspend fun updateJob(
+        @Path("id") id: Long,
+        @Body body: JobUpsertRequest
+    ): JobDetailResponse
 
     @PATCH("jobs/{id}/status")
-    suspend fun updateJobStatus(@Path("id") id: Long, @Body body: JobStatusRequest): JobDetailResponse
+    suspend fun updateJobStatus(
+        @Path("id") id: Long,
+        @Body body: JobStatusRequest
+    ): JobDetailResponse
 
-    //admin only — sets Status = "Cancelled"; returns the row.
+    // Admin only — sets Status = "Cancelled".
     @DELETE("jobs/{id}")
-    suspend fun cancelJob(@Path("id") id: Long): JobDetailResponse
+    suspend fun cancelJob(
+        @Path("id") id: Long
+    ): JobDetailResponse
 
     // --------------------------------------------------------- DeliveryStops ---
 
     @GET("jobs/{jobId}/stops")
-    suspend fun getStopsForJob(@Path("jobId") jobId: Long): StopListResponse
+    suspend fun getStopsForJob(
+        @Path("jobId") jobId: Long
+    ): StopListResponse
 
-    //admin only
+    // Admin only.
     @POST("jobs/{jobId}/stops")
-    suspend fun createStop(@Path("jobId") jobId: Long, @Body body: StopUpsertRequest): StopDetailResponse
+    suspend fun createStop(
+        @Path("jobId") jobId: Long,
+        @Body body: StopUpsertRequest
+    ): StopDetailResponse
 
     @GET("stops/{id}")
-    suspend fun getStop(@Path("id") id: Long): StopDetailResponse
+    suspend fun getStop(
+        @Path("id") id: Long
+    ): StopDetailResponse
 
-    //admin only — edit planning fields.
+    // Admin only — edit planning fields.
     @PATCH("stops/{id}")
-    suspend fun updateStop(@Path("id") id: Long, @Body body: StopUpsertRequest): StopDetailResponse
+    suspend fun updateStop(
+        @Path("id") id: Long,
+        @Body body: StopUpsertRequest
+    ): StopDetailResponse
 
     @PATCH("stops/{id}/status")
-    suspend fun updateStopStatus(@Path("id") id: Long, @Body body: StopStatusRequest): StopDetailResponse
+    suspend fun updateStopStatus(
+        @Path("id") id: Long,
+        @Body body: StopStatusRequest
+    ): StopDetailResponse
 
-    //admin only — sets Status = "Cancelled".
+    // Admin only — sets Status = "Cancelled".
     @DELETE("stops/{id}")
-    suspend fun cancelStop(@Path("id") id: Long): StopDetailResponse
+    suspend fun cancelStop(
+        @Path("id") id: Long
+    ): StopDetailResponse
 
     // ------------------------------------------------------ ProofOfDelivery ---
 
@@ -211,22 +284,28 @@ interface ApiService {
     ): PodDetailResponse
 
     @GET("stops/{stopId}/pod")
-    suspend fun getPodForStop(@Path("stopId") stopId: Long): PodDetailResponse
+    suspend fun getPodForStop(
+        @Path("stopId") stopId: Long
+    ): PodDetailResponse
 
-    //Every POD across the job's stops.
     @GET("jobs/{jobId}/pods")
-    suspend fun getPodsForJob(@Path("jobId") jobId: Long): PodListResponse
+    suspend fun getPodsForJob(
+        @Path("jobId") jobId: Long
+    ): PodListResponse
 
     @GET("pod/{id}")
-    suspend fun getPod(@Path("id") id: Long): PodDetailResponse
+    suspend fun getPod(
+        @Path("id") id: Long
+    ): PodDetailResponse
 
-    //admin only — hard delete + removes the stored files.
+    // Admin only — hard delete + removes the stored files.
     @DELETE("pod/{id}")
-    suspend fun deletePod(@Path("id") id: Long): PodDeleteResponse
+    suspend fun deletePod(
+        @Path("id") id: Long
+    ): PodDeleteResponse
 
     // -------------------------------------------------------- Notifications ---
 
-    //The caller's own notifications, newest first.
     @GET("notifications")
     suspend fun getNotifications(
         @Query("isRead") isRead: Boolean? = null,
@@ -238,32 +317,37 @@ interface ApiService {
     @GET("notifications/unread-count")
     suspend fun getUnreadNotificationCount(): UnreadCountResponse
 
-    //owner or admin
     @GET("notifications/{id}")
-    suspend fun getNotification(@Path("id") id: Long): NotificationDetailResponse
+    suspend fun getNotification(
+        @Path("id") id: Long
+    ): NotificationDetailResponse
 
     @POST("notifications")
-    suspend fun createNotification(@Body body: NotificationCreateRequest): NotificationDetailResponse
+    suspend fun createNotification(
+        @Body body: NotificationCreateRequest
+    ): NotificationDetailResponse
 
-    //Mark all the caller's unread notifications as read.
     @POST("notifications/read-all")
     suspend fun markAllNotificationsRead(): MarkAllReadResponse
 
-    //owner only — body { IsRead }.
     @PATCH("notifications/{id}")
-    suspend fun updateNotification(@Path("id") id: Long, @Body body: NotificationReadRequest): NotificationDetailResponse
+    suspend fun updateNotification(
+        @Path("id") id: Long,
+        @Body body: NotificationReadRequest
+    ): NotificationDetailResponse
 
-    //owner or admin
     @DELETE("notifications/{id}")
-    suspend fun deleteNotification(@Path("id") id: Long): NotificationDeleteResponse
+    suspend fun deleteNotification(
+        @Path("id") id: Long
+    ): NotificationDeleteResponse
 
     // --------------------------------------------------------- Offline sync ---
 
-    //Replay 1..50 queued actions. Always HTTP 200 with a per-action result array.
     @POST("sync")
-    suspend fun submitSync(@Body body: SyncSubmitRequest): SyncSubmitResponse
+    suspend fun submitSync(
+        @Body body: SyncSubmitRequest
+    ): SyncSubmitResponse
 
-    //The caller's own queued actions, newest first.
     @GET("sync")
     suspend fun getSyncActions(
         @Query("status") status: String? = null,
@@ -272,16 +356,18 @@ interface ApiService {
         @Query("offset") offset: Int? = null,
     ): SyncActionListResponse
 
-    //One action's status by its UUID (owner or admin).
     @GET("sync/{id}")
-    suspend fun getSyncAction(@Path("id") id: String): SyncActionDetailResponse
+    suspend fun getSyncAction(
+        @Path("id") id: String
+    ): SyncActionDetailResponse
 
-    //Re-attempt a Failed action (owner or admin).
     @POST("sync/{id}/retry")
-    suspend fun retrySyncAction(@Path("id") id: String): SyncActionDetailResponse
+    suspend fun retrySyncAction(
+        @Path("id") id: String
+    ): SyncActionDetailResponse
 }
 
-//Body for POST auth/login. `idToken` is the Google ID token from Credential Manager.
+// Body for POST auth/login.
 data class LoginRequest(
     val idToken: String,
 )
@@ -292,7 +378,6 @@ data class LoginResponse(
 )
 
 data class UserResponse(
-    // Numeric UserId, serialized by the API as a JSON number; Gson reads it as a String.
     val id: String,
     val email: String,
     val firstName: String,
@@ -301,14 +386,14 @@ data class UserResponse(
     val role: String,
 )
 
-//Envelope returned by GET jobs.
+// Envelope returned by GET jobs.
 data class JobListResponse(
     val jobs: List<JobResponse>,
     val limit: Int,
     val offset: Int,
 )
 
-//Envelope returned by GET jobs/{id}.
+// Envelope returned by GET jobs/{id}.
 data class JobDetailResponse(
     val job: JobResponse,
 )
@@ -319,12 +404,16 @@ data class JobResponse(
     @SerializedName("DriverId") val driverId: Long?,
     @SerializedName("VehicleId") val vehicleId: Long?,
     @SerializedName("DepotId") val depotId: Long,
-    //ISO 8601 date/time string.
+
+    // ISO 8601 date/time string.
     @SerializedName("ScheduledDate") val scheduledDate: String,
-    //"Pending" | "Assigned" | "EnRoute" | "Completed" | "Cancelled"
+
+    // "Pending" | "Assigned" | "EnRoute" | "Completed" | "Cancelled"
     @SerializedName("Status") val status: String,
-    //"Low" | "Normal" | "High" | "Urgent"
+
+    // "Low" | "Normal" | "High" | "Urgent"
     @SerializedName("Priority") val priority: String,
+
     @SerializedName("Notes") val notes: String?,
     @SerializedName("EstimatedDistanceKm") val estimatedDistanceKm: Double?,
     @SerializedName("EstimatedDurationMinutes") val estimatedDurationMinutes: Int?,

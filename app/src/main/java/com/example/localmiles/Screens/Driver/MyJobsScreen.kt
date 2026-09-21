@@ -47,6 +47,12 @@ fun MyJobsScreen(
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.align(Alignment.Center)
                 )
+            } else if (viewModel.jobs.isEmpty()) {
+                Text(
+                    text = "No jobs listed",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.align(Alignment.Center)
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),

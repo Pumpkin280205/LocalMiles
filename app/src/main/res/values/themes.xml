@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.LocalMiles" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.LocalMiles" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">@color/local_miles_dark_teal</item>
+        <item name="android:colorPrimaryDark">@color/local_miles_dark_teal</item>
+        <item name="android:colorAccent">@color/local_miles_green</item>
+        <item name="android:windowBackground">@color/local_miles_background</item>
+    </style>
 </resources>

@@ -15,6 +15,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.UserAccountResponse
 import com.example.localmiles.Core.Utils.Role
 
@@ -45,6 +53,7 @@ private val ASSIGNABLE_ROLES = listOf(Role.ADMIN, Role.DRIVER, Role.CLIENT)
  * by hand. Backed by GET/PATCH /api/users, which are gated server-side to
  * ROLE.ADMIN regardless of what this screen shows.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UserManagementScreen(
     viewModel: UserManagementViewModel,
@@ -89,6 +98,23 @@ fun UserManagementScreen(
                 },
                 title = { Text("Something went wrong") },
                 text = { Text(uiState.errorMessage!!) },
+            )
+        }
+
+        if (uiState.pendingDriverPromotion != null) {
+            PromoteToDriverDialog(
+                user = uiState.pendingDriverPromotion!!,
+                depots = uiState.depots,
+                isSubmitting = uiState.isSubmittingDriverPromotion,
+                onDismiss = viewModel::cancelPromoteToDriver,
+                onConfirm = { depotId, employeeNumber, phoneNumber, licenceNumber ->
+                    viewModel.confirmPromoteToDriver(
+                        depotId = depotId,
+                        employeeNumber = employeeNumber,
+                        phoneNumber = phoneNumber,
+                        licenceNumber = licenceNumber,
+                    )
+                },
             )
         }
 
@@ -162,4 +188,122 @@ private fun UserRow(
             }
         }
     }
+}
+
+/**
+ * Collects the Driver record's required fields (depot, employee number, phone,
+ * licence) before promoting a user to the driver role. A driver row is a hard
+ * requirement — see UserManagementViewModel.confirmPromoteToDriver.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PromoteToDriverDialog(
+    user: UserAccountResponse,
+    depots: List<DepotResponse>,
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (depotId: Long, employeeNumber: String, phoneNumber: String, licenceNumber: String) -> Unit,
+) {
+    var depotMenuExpanded by remember { mutableStateOf(false) }
+    var selectedDepot by remember(depots) { mutableStateOf(depots.firstOrNull()) }
+    var employeeNumber by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var licenceNumber by remember { mutableStateOf("") }
+
+    val canSubmit = selectedDepot != null &&
+        employeeNumber.isNotBlank() &&
+        phoneNumber.isNotBlank() &&
+        licenceNumber.isNotBlank() &&
+        !isSubmitting
+
+    AlertDialog(
+        onDismissRequest = { if (!isSubmitting) onDismiss() },
+        title = { Text("Make ${user.firstName} a driver") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "A driver account needs a depot and licence details before it can go live.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = depotMenuExpanded,
+                    onExpandedChange = { depotMenuExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = selectedDepot?.name ?: "No active depots",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Depot") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = depotMenuExpanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = depotMenuExpanded,
+                        onDismissRequest = { depotMenuExpanded = false },
+                    ) {
+                        depots.forEach { depot ->
+                            DropdownMenuItem(
+                                text = { Text(depot.name) },
+                                onClick = {
+                                    selectedDepot = depot
+                                    depotMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = employeeNumber,
+                    onValueChange = { employeeNumber = it },
+                    label = { Text("Employee number") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                OutlinedTextField(
+                    value = phoneNumber,
+                    onValueChange = { phoneNumber = it },
+                    label = { Text("Phone number") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                OutlinedTextField(
+                    value = licenceNumber,
+                    onValueChange = { licenceNumber = it },
+                    label = { Text("Licence number") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSubmit,
+                onClick = {
+                    val depotId = selectedDepot?.depotId ?: return@TextButton
+                    onConfirm(depotId, employeeNumber.trim(), phoneNumber.trim(), licenceNumber.trim())
+                },
+            ) {
+                if (isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Create driver")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSubmitting) {
+                Text("Cancel")
+            }
+        },
+    )
 }
