@@ -72,13 +72,6 @@ interface ApiService {
     suspend fun updateCurrentUser(
         @Body body: UserProfileUpdateRequest
     ): UserDetailResponse
-    //admin only — every account and its role.
-    @GET("users")
-    suspend fun getUsers(): UserListResponse
-
-    //admin only — promote/demote a user's role.
-    @PATCH("users/{id}/role")
-    suspend fun updateUserRole(@Path("id") id: Long, @Body body: UserRoleUpdateRequest): UserDetailResponse
 
     // --------------------------------------------------------------- Depots ---
 

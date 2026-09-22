@@ -30,7 +30,6 @@ fun StopDetailsScreen(
         topBar = {
             AppTopBar(
                 title = "Job #$jobId",
-                title = "Job #$jobId Stops",
                 showBack = true,
                 onBack = onBack
             )
@@ -44,9 +43,6 @@ fun StopDetailsScreen(
             if (viewModel.isLoading && viewModel.currentJobStops.isEmpty() && viewModel.currentJob == null) {
                 LoadingIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (viewModel.error != null && viewModel.currentJobStops.isEmpty() && viewModel.currentJob == null) {
-            if (viewModel.isLoading && viewModel.currentJobStops.isEmpty()) {
-                LoadingIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (viewModel.error != null && viewModel.currentJobStops.isEmpty()) {
                 Text(
                     text = viewModel.error ?: "Unknown error",
                     color = MaterialTheme.colorScheme.error,

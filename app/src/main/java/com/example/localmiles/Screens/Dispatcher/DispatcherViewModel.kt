@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 data class DispatcherUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
+    val isSavingVehicle: Boolean = false,
     val errorMessage: String? = null,
 
     val jobs: List<JobResponse> = emptyList(),
@@ -402,6 +403,119 @@ class DispatcherViewModel(
             } catch (e: Exception) {
 
                 _uiState.value = _uiState.value.copy(
+                    errorMessage = e.message ?: "Unable to update vehicle."
+                )
+            }
+        }
+    }
+
+
+    /**
+     * Creates a new vehicle from Fleet Management.
+     */
+    fun createVehicle(
+        depotId: Long,
+        registrationNumber: String,
+        make: String,
+        model: String,
+        vehicleType: String,
+        capacityKg: Double,
+        onSuccess: () -> Unit
+    ) {
+
+        viewModelScope.launch {
+
+            _uiState.value = _uiState.value.copy(
+                isSavingVehicle = true,
+                errorMessage = null
+            )
+
+            try {
+
+                val response = api.createVehicle(
+                    VehicleUpsertRequest(
+                        depotId = depotId,
+                        registrationNumber = registrationNumber,
+                        make = make,
+                        model = model,
+                        vehicleType = vehicleType,
+                        capacityKg = capacityKg,
+                        isAvailable = true,
+                        isActive = true
+                    )
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingVehicle = false,
+                    vehicles = _uiState.value.vehicles + response.vehicle
+                )
+
+                onSuccess()
+
+            } catch (e: Exception) {
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingVehicle = false,
+                    errorMessage = e.message ?: "Unable to create vehicle."
+                )
+            }
+        }
+    }
+
+
+    /**
+     * Updates an existing vehicle's details from Fleet Management.
+     */
+    fun updateVehicleDetails(
+        vehicleId: Long,
+        depotId: Long,
+        registrationNumber: String,
+        make: String,
+        model: String,
+        vehicleType: String,
+        capacityKg: Double,
+        onSuccess: () -> Unit
+    ) {
+
+        viewModelScope.launch {
+
+            _uiState.value = _uiState.value.copy(
+                isSavingVehicle = true,
+                errorMessage = null
+            )
+
+            try {
+
+                val response = api.updateVehicle(
+                    id = vehicleId,
+                    body = VehicleUpsertRequest(
+                        depotId = depotId,
+                        registrationNumber = registrationNumber,
+                        make = make,
+                        model = model,
+                        vehicleType = vehicleType,
+                        capacityKg = capacityKg
+                    )
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingVehicle = false,
+                    vehicles = _uiState.value.vehicles.map { vehicle ->
+
+                        if (vehicle.vehicleId == vehicleId) {
+                            response.vehicle
+                        } else {
+                            vehicle
+                        }
+                    }
+                )
+
+                onSuccess()
+
+            } catch (e: Exception) {
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingVehicle = false,
                     errorMessage = e.message ?: "Unable to update vehicle."
                 )
             }

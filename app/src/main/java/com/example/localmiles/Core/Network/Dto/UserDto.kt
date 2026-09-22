@@ -10,9 +10,6 @@ data class UserAccountResponse(
 
     // "admin" | "driver" | "client"
     @SerializedName("Role") val role: String,
-
-    //"admin" | "driver" | "client"
-    @SerializedName("Role") val role: String,
     @SerializedName("IsActive") val isActive: Boolean,
     @SerializedName("CreatedAt") val createdAt: String,
     @SerializedName("LastLoginAt") val lastLoginAt: String?,

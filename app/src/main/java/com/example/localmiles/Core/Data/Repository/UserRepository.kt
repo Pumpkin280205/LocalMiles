@@ -69,15 +69,3 @@ class UserRepository(
             ).user
         }
 }
-    session: SessionManager,
-    private val api: ApiService = RetrofitClient.getApiService(session),
-) {
-
-    //GET users — admin only.
-    suspend fun getUsers(): Result<List<UserAccountResponse>> =
-        apiCall { api.getUsers().users }
-
-    //PATCH users/{id}/role — admin only.
-    suspend fun updateUserRole(id: Long, role: String): Result<UserAccountResponse> =
-        apiCall { api.updateUserRole(id, UserRoleUpdateRequest(role = role)).user }
-}

@@ -11,32 +11,45 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
 
@@ -47,6 +60,14 @@ fun FleetManagementScreen(
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    var showAddVehicleDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var editingVehicle by remember {
+        mutableStateOf<VehicleResponse?>(null)
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadDispatcherData()
@@ -82,6 +103,18 @@ fun FleetManagementScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    showAddVehicleDialog = true
+                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add vehicle"
+                )
+            }
         }
     ) { paddingValues ->
 
@@ -263,6 +296,9 @@ fun FleetManagementScreen(
                                         vehicleId = vehicle.vehicleId,
                                         active = active
                                     )
+                                },
+                                onEdit = {
+                                    editingVehicle = vehicle
                                 }
                             )
                         }
@@ -286,6 +322,59 @@ fun FleetManagementScreen(
                 }
             }
         }
+    }
+
+    if (showAddVehicleDialog) {
+        VehicleFormDialog(
+            vehicle = null,
+            depots = uiState.depots,
+            isSaving = uiState.isSavingVehicle,
+            errorMessage = uiState.errorMessage,
+            onDismiss = {
+                showAddVehicleDialog = false
+            },
+            onSubmit = { depotId, registrationNumber, make, model, vehicleType, capacityKg ->
+                viewModel.createVehicle(
+                    depotId = depotId,
+                    registrationNumber = registrationNumber,
+                    make = make,
+                    model = model,
+                    vehicleType = vehicleType,
+                    capacityKg = capacityKg,
+                    onSuccess = {
+                        showAddVehicleDialog = false
+                    }
+                )
+            }
+        )
+    }
+
+    if (editingVehicle != null) {
+        val vehicle = editingVehicle!!
+
+        VehicleFormDialog(
+            vehicle = vehicle,
+            depots = uiState.depots,
+            isSaving = uiState.isSavingVehicle,
+            errorMessage = uiState.errorMessage,
+            onDismiss = {
+                editingVehicle = null
+            },
+            onSubmit = { depotId, registrationNumber, make, model, vehicleType, capacityKg ->
+                viewModel.updateVehicleDetails(
+                    vehicleId = vehicle.vehicleId,
+                    depotId = depotId,
+                    registrationNumber = registrationNumber,
+                    make = make,
+                    model = model,
+                    vehicleType = vehicleType,
+                    capacityKg = capacityKg,
+                    onSuccess = {
+                        editingVehicle = null
+                    }
+                )
+            }
+        )
     }
 }
 
@@ -490,7 +579,8 @@ private fun FleetDriverCard(
 @Composable
 private fun FleetVehicleCard(
     vehicle: VehicleResponse,
-    onToggleActive: (Boolean) -> Unit
+    onToggleActive: (Boolean) -> Unit,
+    onEdit: () -> Unit
 ) {
     val statusText = when {
         !vehicle.isActive -> "Inactive"
@@ -542,6 +632,15 @@ private fun FleetVehicleCard(
                     text = statusText,
                     fontWeight = FontWeight.Bold
                 )
+
+                IconButton(
+                    onClick = onEdit
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit vehicle"
+                    )
+                }
             }
 
             HorizontalDivider()
@@ -596,4 +695,196 @@ private fun FleetVehicleCard(
             }
         }
     }
+}
+
+/**
+ * Add/Edit form for a vehicle. [vehicle] is null when adding a new one, or the
+ * vehicle being edited otherwise.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VehicleFormDialog(
+    vehicle: VehicleResponse?,
+    depots: List<DepotResponse>,
+    isSaving: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSubmit: (
+        depotId: Long,
+        registrationNumber: String,
+        make: String,
+        model: String,
+        vehicleType: String,
+        capacityKg: Double
+    ) -> Unit
+) {
+    val isEditMode = vehicle != null
+
+    var depotMenuExpanded by remember {
+        mutableStateOf(false)
+    }
+
+    var selectedDepot by remember(depots, vehicle) {
+        mutableStateOf(
+            depots.firstOrNull { it.depotId == vehicle?.depotId }
+                ?: depots.firstOrNull()
+        )
+    }
+
+    var registrationNumber by remember(vehicle) {
+        mutableStateOf(vehicle?.registrationNumber ?: "")
+    }
+
+    var make by remember(vehicle) {
+        mutableStateOf(vehicle?.make ?: "")
+    }
+
+    var model by remember(vehicle) {
+        mutableStateOf(vehicle?.model ?: "")
+    }
+
+    var vehicleType by remember(vehicle) {
+        mutableStateOf(vehicle?.vehicleType ?: "")
+    }
+
+    var capacityKg by remember(vehicle) {
+        mutableStateOf(vehicle?.capacityKg?.toString() ?: "")
+    }
+
+    val canSubmit = selectedDepot != null &&
+            registrationNumber.isNotBlank() &&
+            make.isNotBlank() &&
+            model.isNotBlank() &&
+            vehicleType.isNotBlank() &&
+            capacityKg.toDoubleOrNull() != null &&
+            !isSaving
+
+    AlertDialog(
+        onDismissRequest = {
+            if (!isSaving) onDismiss()
+        },
+        title = {
+            Text(if (isEditMode) "Edit vehicle" else "Add vehicle")
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+
+                ExposedDropdownMenuBox(
+                    expanded = depotMenuExpanded,
+                    onExpandedChange = { depotMenuExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = selectedDepot?.name ?: "No active depots",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Depot") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = depotMenuExpanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = depotMenuExpanded,
+                        onDismissRequest = { depotMenuExpanded = false }
+                    ) {
+                        depots.forEach { depot ->
+                            DropdownMenuItem(
+                                text = { Text(depot.name) },
+                                onClick = {
+                                    selectedDepot = depot
+                                    depotMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = registrationNumber,
+                    onValueChange = { registrationNumber = it },
+                    label = { Text("Registration number") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = make,
+                    onValueChange = { make = it },
+                    label = { Text("Make") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    label = { Text("Model") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = vehicleType,
+                    onValueChange = { vehicleType = it },
+                    label = { Text("Vehicle type") },
+                    placeholder = { Text("Truck, Van, ...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = capacityKg,
+                    onValueChange = { capacityKg = it },
+                    label = { Text("Capacity (kg)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = canSubmit,
+                onClick = {
+                    val depotId = selectedDepot?.depotId ?: return@TextButton
+                    val capacity = capacityKg.toDoubleOrNull() ?: return@TextButton
+
+                    onSubmit(
+                        depotId,
+                        registrationNumber.trim(),
+                        make.trim(),
+                        model.trim(),
+                        vehicleType.trim(),
+                        capacity
+                    )
+                }
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text(if (isEditMode) "Save Changes" else "Add Vehicle")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }
