@@ -48,6 +48,16 @@ function parseClientInput(body: any): ParseResult {
   return { ok: true, value: out };
 }
 
+//GET /api/clients — admin only. Used to populate client pickers (e.g. job creation). */
+export async function listClients(req: Request, res: Response) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .order('ClientId', { ascending: true });
+  if (error) return writeError(res, error, 'Database error');
+  return res.json({ clients: data });
+}
+
 //POST /api/clients — admin only. Links a User to a new Client (company) record. */
 export async function createClient(req: Request, res: Response) {
   const parsed = parseClientInput(req.body);

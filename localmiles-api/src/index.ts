@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { loginHandler, switchRoleHandler } from './controllers/authController.js';
 import { requireAuth, requireRole, ROLE } from './middleware/auth.js';
-import { createClient } from './controllers/clientController.js';
+import { listClients, createClient } from './controllers/clientController.js';
 import {
   listDepots,
   getDepot,
@@ -95,6 +95,7 @@ app.patch('/api/users/:id/role', requireRole(ROLE.ADMIN), updateUserRole);
 
 // Clients: admin only. Links a User to a Client (company) record — the piece
 // self-signup can't do on its own, since a client only sees jobs once this exists.
+app.get('/api/clients', requireRole(ROLE.ADMIN), listClients);
 app.post('/api/clients', requireRole(ROLE.ADMIN), createClient);
 
 // Depots: any authenticated user can read; only admins can mutate.

@@ -63,6 +63,22 @@ export async function loginHandler(req: Request, res: Response) {
         return res.status(500).json({ error: 'Could not create user' });
       }
       user = createdUser;
+
+      // New self-registered users default to the client role — give them a
+      // linked Client row immediately so a dispatcher can assign jobs to
+      // them right away, without a separate manual POST /api/clients step.
+      if (user.Role === ROLE.CLIENT) {
+        const { error: clientInsertError } = await supabase.from('Client').insert({
+          UserId: user.UserId,
+          CompanyName: `${user.FirstName ?? ''} ${user.LastName ?? ''}`.trim() || user.Email,
+          ContactPerson: `${user.FirstName ?? ''} ${user.LastName ?? ''}`.trim() || user.Email,
+          Email: user.Email,
+          Address: 'Not provided',
+        });
+        if (clientInsertError) {
+          console.error('Supabase insert failed (Client row):', clientInsertError);
+        }
+      }
     }
 
     // 5. Sign our own session JWT for the client to send on later requests.
