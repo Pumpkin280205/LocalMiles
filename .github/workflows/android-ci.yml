@@ -29,12 +29,12 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
 
-- name: Build debug APK                                                                                                                                                     
-          run: ./gradlew assembleDebug --stacktrace                                                                                                                                 
-                                                                                                                                                                                    
-        - name: Upload test results                                                                                                                                                 
-          if: always()                                                                                                                                                              
-          uses: actions/upload-artifact@v4                                                                                                                                          
-          with:                                                                                                                                                                     
-            name: unit-test-results                                                                                                                                                 
-            path: app/build/reports/tests/testDebugUnitTest   
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/reports/tests/testDebugUnitTest
