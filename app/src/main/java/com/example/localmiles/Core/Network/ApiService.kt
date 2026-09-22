@@ -1,5 +1,6 @@
 package com.example.localmiles.Core.Network
 
+import com.example.localmiles.Core.Network.Dto.ClientListResponse
 import com.example.localmiles.Core.Network.Dto.DepotDetailResponse
 import com.example.localmiles.Core.Network.Dto.DepotListResponse
 import com.example.localmiles.Core.Network.Dto.DepotUpsertRequest
@@ -74,6 +75,9 @@ interface ApiService {
     ): UserDetailResponse
 
     // --------------------------------------------------------------- Depots ---
+
+    @GET("clients")
+    suspend fun getClients(): ClientListResponse
 
     @GET("depots")
     suspend fun getDepots(

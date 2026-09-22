@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.localmiles.Core.Data.Repository.JobRepository
 import com.example.localmiles.Core.Network.ApiService
+import com.example.localmiles.Core.Network.Dto.ClientResponse
 import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.JobUpsertRequest
+import com.example.localmiles.Core.Network.Dto.StopUpsertRequest
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
 import com.example.localmiles.Core.Network.Dto.VehicleUpsertRequest
 import com.example.localmiles.Core.Network.JobResponse
@@ -20,15 +22,19 @@ data class DispatcherUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isSavingVehicle: Boolean = false,
+    val isSavingStop: Boolean = false,
     val errorMessage: String? = null,
 
     val jobs: List<JobResponse> = emptyList(),
     val drivers: List<DriverResponse> = emptyList(),
     val vehicles: List<VehicleResponse> = emptyList(),
     val depots: List<DepotResponse> = emptyList(),
+    val clients: List<ClientResponse> = emptyList(),
 
     val selectedJob: JobResponse? = null,
-    val saveSuccessful: Boolean = false
+    val saveSuccessful: Boolean = false,
+
+    val stopCounts: Map<Long, Int> = emptyMap()
 )
 
 class DispatcherViewModel(
@@ -75,6 +81,8 @@ class DispatcherViewModel(
                     active = true
                 )
 
+                val clients = api.getClients().clients
+
                 val jobs = when (jobsResult) {
 
                     is Result.Success ->
@@ -99,8 +107,11 @@ class DispatcherViewModel(
                     drivers = driversResponse.drivers,
                     vehicles = vehiclesResponse.vehicles,
                     depots = depotsResponse.depots,
+                    clients = clients,
                     errorMessage = jobError
                 )
+
+                loadStopCounts(jobs.map { it.jobId })
 
             } catch (e: Exception) {
 
@@ -109,6 +120,25 @@ class DispatcherViewModel(
                     errorMessage = e.message ?: "Unable to load dispatcher data."
                 )
             }
+        }
+    }
+
+    /**
+     * How many delivery stops each job has, shown as a badge on its card so a
+     * dispatcher can see whether a job is still missing stops.
+     */
+    private fun loadStopCounts(jobIds: List<Long>) {
+
+        viewModelScope.launch {
+
+            val counts = jobIds.associateWith { jobId ->
+                when (val result = jobRepository.getStopsForJob(jobId)) {
+                    is Result.Success -> result.data.size
+                    is Result.Error -> 0
+                }
+            }
+
+            _uiState.value = _uiState.value.copy(stopCounts = counts)
         }
     }
 
@@ -528,5 +558,58 @@ class DispatcherViewModel(
         _uiState.value = _uiState.value.copy(
             saveSuccessful = false
         )
+    }
+
+    /**
+     * Adds a delivery stop to a job so a driver has something to mark Arrived /
+     * Completed against on the Stop Details screen.
+     */
+    fun createStop(
+        jobId: Long,
+        sequenceNumber: Int,
+        recipientName: String,
+        address: String,
+        latitude: Double,
+        longitude: Double,
+        instructions: String?,
+        onSuccess: () -> Unit
+    ) {
+
+        viewModelScope.launch {
+
+            _uiState.value = _uiState.value.copy(
+                isSavingStop = true,
+                errorMessage = null
+            )
+
+            try {
+
+                api.createStop(
+                    jobId,
+                    StopUpsertRequest(
+                        sequenceNumber = sequenceNumber,
+                        recipientName = recipientName,
+                        address = address,
+                        latitude = latitude,
+                        longitude = longitude,
+                        instructions = instructions
+                    )
+                )
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingStop = false,
+                    stopCounts = _uiState.value.stopCounts +
+                        (jobId to ((_uiState.value.stopCounts[jobId] ?: 0) + 1))
+                )
+                onSuccess()
+
+            } catch (e: Exception) {
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingStop = false,
+                    errorMessage = e.message ?: "Unable to add stop."
+                )
+            }
+        }
     }
 }

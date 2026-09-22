@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -31,6 +34,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,6 +63,10 @@ fun JobListScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     var selectedJobForDelete by remember {
+        mutableStateOf<JobResponse?>(null)
+    }
+
+    var selectedJobForAddStop by remember {
         mutableStateOf<JobResponse?>(null)
     }
 
@@ -379,6 +387,7 @@ fun JobListScreen(
 
                                 JobCard(
                                     job = job,
+                                    stopCount = uiState.stopCounts[job.jobId] ?: 0,
                                     onEdit = {
                                         onEditJob(job)
                                     },
@@ -390,6 +399,9 @@ fun JobListScreen(
                                             jobId = job.jobId,
                                             status = status
                                         )
+                                    },
+                                    onAddStop = {
+                                        selectedJobForAddStop = job
                                     }
                                 )
                             }
@@ -461,6 +473,123 @@ fun JobListScreen(
             }
         )
     }
+
+    if (selectedJobForAddStop != null) {
+
+        val job = selectedJobForAddStop!!
+
+        AddStopDialog(
+            jobId = job.jobId,
+            isSaving = uiState.isSavingStop,
+            onDismiss = {
+                selectedJobForAddStop = null
+            },
+            onSave = { sequenceNumber, recipientName, address, instructions ->
+
+                viewModel.createStop(
+                    jobId = job.jobId,
+                    sequenceNumber = sequenceNumber,
+                    recipientName = recipientName,
+                    address = address,
+                    latitude = 0.0,
+                    longitude = 0.0,
+                    instructions = instructions,
+                    onSuccess = {
+                        selectedJobForAddStop = null
+                    }
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddStopDialog(
+    jobId: Long,
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (
+        sequenceNumber: Int,
+        recipientName: String,
+        address: String,
+        instructions: String?
+    ) -> Unit
+) {
+
+    var sequenceNumber by remember { mutableStateOf("1") }
+    var recipientName by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var instructions by remember { mutableStateOf("") }
+
+    val parsedSequence = sequenceNumber.toIntOrNull()
+
+    val isValid = parsedSequence != null &&
+        recipientName.isNotBlank() &&
+        address.isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Add stop to Job #$jobId")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+
+                OutlinedTextField(
+                    value = sequenceNumber,
+                    onValueChange = { sequenceNumber = it },
+                    label = { Text("Sequence number") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = recipientName,
+                    onValueChange = { recipientName = it },
+                    label = { Text("Recipient name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Address") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = instructions,
+                    onValueChange = { instructions = it },
+                    label = { Text("Instructions (optional)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = isValid && !isSaving,
+                onClick = {
+                    onSave(
+                        parsedSequence!!,
+                        recipientName.trim(),
+                        address.trim(),
+                        instructions.trim().ifBlank { null }
+                    )
+                }
+            ) {
+                Text(if (isSaving) "Saving..." else "Add Stop")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -584,9 +713,11 @@ private fun JobStatusCount(
 @Composable
 private fun JobCard(
     job: JobResponse,
+    stopCount: Int,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onStatusChange: (String) -> Unit
+    onStatusChange: (String) -> Unit,
+    onAddStop: () -> Unit
 ) {
 
     var statusMenuExpanded by remember {
@@ -736,6 +867,28 @@ private fun JobCard(
                     text = "Notes: ${job.notes}",
                     style = MaterialTheme.typography.bodyMedium
                 )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (stopCount == 1) "1 stop" else "$stopCount stops",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+
+                TextButton(onClick = onAddStop) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Stop")
+                }
             }
         }
     }

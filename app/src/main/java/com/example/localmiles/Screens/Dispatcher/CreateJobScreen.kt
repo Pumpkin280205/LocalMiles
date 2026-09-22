@@ -93,6 +93,10 @@ fun CreateJobScreen(
         mutableStateOf(false)
     }
 
+    var clientExpanded by remember {
+        mutableStateOf(false)
+    }
+
     var depotExpanded by remember {
         mutableStateOf(false)
     }
@@ -236,30 +240,89 @@ fun CreateJobScreen(
                     )
 
                     /*
-                     * Client ID
+                     * Client
                      */
 
-                    OutlinedTextField(
-
-                        value = clientId,
-
-                        onValueChange = {
-                            clientId = it
-                            showValidationError = false
-                        },
-
-                        modifier = Modifier.fillMaxWidth(),
-
-                        label = {
-                            Text("Client ID")
-                        },
-
-                        placeholder = {
-                            Text("Example: 12")
-                        },
-
-                        singleLine = true
+                    Text(
+                        text = "Client",
+                        fontWeight = FontWeight.Medium
                     )
+
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+
+                        OutlinedTextField(
+
+                            value = uiState.clients
+                                .firstOrNull {
+                                    it.clientId == clientId.toLongOrNull()
+                                }
+                                ?.let {
+                                    "${it.contactPerson} (${it.companyName})"
+                                }
+                                ?: "Select client",
+
+                            onValueChange = {},
+
+                            readOnly = true,
+
+                            modifier = Modifier.fillMaxWidth(),
+
+                            label = {
+                                Text("Client")
+                            },
+
+                            trailingIcon = {
+
+                                TextButton(
+                                    onClick = {
+                                        clientExpanded = true
+                                    }
+                                ) {
+                                    Text("Select")
+                                }
+                            }
+                        )
+
+                        DropdownMenu(
+
+                            expanded = clientExpanded,
+
+                            onDismissRequest = {
+                                clientExpanded = false
+                            }
+                        ) {
+
+                            if (uiState.clients.isEmpty()) {
+
+                                DropdownMenuItem(
+                                    text = { Text("No clients found") },
+                                    onClick = { clientExpanded = false }
+                                )
+                            }
+
+                            uiState.clients.forEach { client ->
+
+                                DropdownMenuItem(
+
+                                    text = {
+                                        Text(
+                                            "${client.contactPerson} (${client.companyName})"
+                                        )
+                                    },
+
+                                    onClick = {
+
+                                        clientId = client.clientId.toString()
+                                        showValidationError = false
+
+                                        clientExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
 
 
                     /*

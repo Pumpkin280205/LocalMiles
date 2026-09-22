@@ -60,7 +60,11 @@ fun MyJobsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(viewModel.jobs) { job ->
-                        JobItem(job = job, onClick = { onJobClick(job.jobId) })
+                        JobItem(
+                            job = job,
+                            stopCount = viewModel.stopCounts[job.jobId] ?: 0,
+                            onClick = { onJobClick(job.jobId) },
+                        )
                     }
                 }
             }
@@ -69,7 +73,7 @@ fun MyJobsScreen(
 }
 
 @Composable
-fun JobItem(job: JobResponse, onClick: () -> Unit) {
+fun JobItem(job: JobResponse, stopCount: Int, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -90,6 +94,7 @@ fun JobItem(job: JobResponse, onClick: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = "Scheduled: ${job.scheduledDate}")
+            Text(text = if (stopCount == 1) "1 stop" else "$stopCount stops")
             if (job.notes != null) {
                 Text(
                     text = job.notes,

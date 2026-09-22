@@ -25,6 +25,9 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
     var jobs by mutableStateOf<List<JobResponse>>(emptyList())
         private set
 
+    var stopCounts by mutableStateOf<Map<Long, Int>>(emptyMap())
+        private set
+
     var isLoading by mutableStateOf(false)
         private set
 
@@ -42,10 +45,24 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
             isLoading = true
             error = null
             when (val result = jobRepository.getJobs(mine = true)) {
-                is Result.Success -> jobs = result.data
+                is Result.Success -> {
+                    jobs = result.data
+                    loadStopCounts(result.data.map { it.jobId })
+                }
                 is Result.Error -> error = result.message
             }
             isLoading = false
+        }
+    }
+
+    private fun loadStopCounts(jobIds: List<Long>) {
+        viewModelScope.launch {
+            stopCounts = jobIds.associateWith { jobId ->
+                when (val result = stopRepository.getStopsForJob(jobId)) {
+                    is Result.Success -> result.data.size
+                    is Result.Error -> 0
+                }
+            }
         }
     }
 
@@ -71,6 +88,7 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             when (val result = jobRepository.updateStatus(jobId, status)) {
                 is Result.Success -> {
+                    currentJob = result.data
                     // Refresh jobs list
                     loadMyJobs()
                 }
@@ -83,7 +101,19 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             when (val result = stopRepository.updateStatus(stopId, status)) {
                 is Result.Success -> {
-                    // Refresh stops for current job
+                    // Once every stop on this job is Completed, flip the job itself to
+                    // Completed too — the client's tracking screen reads job.status, not
+                    // individual stop statuses, for its top-level progress display.
+                    if (status == "Completed") {
+                        val stopsResult = stopRepository.getStopsForJob(jobId)
+                        if (stopsResult is Result.Success &&
+                            stopsResult.data.isNotEmpty() &&
+                            stopsResult.data.all { it.status == "Completed" }
+                        ) {
+                            jobRepository.updateStatus(jobId, "Completed")
+                        }
+                    }
+                    // Refresh stops (and job) for current job
                     loadStopsForJob(jobId)
                 }
                 is Result.Error -> error = result.message
@@ -99,7 +129,9 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
         longitude: Double,
         notes: String?,
         photo: File?,
-        signature: File?
+        signature: File?,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {},
     ) {
         viewModelScope.launch {
             isLoading = true
@@ -116,10 +148,15 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
                 is Result.Success -> {
                     // Mark stop as completed if POD is successful
                     updateStopStatus(stopId, jobId, "Completed")
+                    isLoading = false
+                    onSuccess()
                 }
-                is Result.Error -> error = result.message
+                is Result.Error -> {
+                    error = result.message
+                    isLoading = false
+                    onError(result.message)
+                }
             }
-            isLoading = false
         }
     }
 }

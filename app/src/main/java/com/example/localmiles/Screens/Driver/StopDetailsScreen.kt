@@ -56,20 +56,49 @@ fun StopDetailsScreen(
                 ) {
                     viewModel.currentJob?.let { job ->
                         item {
-                            JobDetailsCard(job = job)
+                            JobDetailsCard(
+                                job = job,
+                                onStartJob = { viewModel.updateJobStatus(jobId, "EnRoute") },
+                            )
                         }
 
                         item {
-                            Text(
-                                text = "Stops",
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                            val sortedStops = viewModel.currentJobStops.sortedBy { it.sequenceNumber }
+                            val total = sortedStops.size
+                            val activeIndex = sortedStops.indexOfFirst {
+                                it.status != "Completed" && it.status != "Cancelled"
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "Stops",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = if (activeIndex == -1) {
+                                        "All $total stops completed"
+                                    } else {
+                                        "Stop ${activeIndex + 1} of $total"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
                         }
                     }
 
-                    items(viewModel.currentJobStops) { stop ->
+                    val sortedStops = viewModel.currentJobStops.sortedBy { it.sequenceNumber }
+                    val activeStopId = sortedStops.firstOrNull {
+                        it.status != "Completed" && it.status != "Cancelled"
+                    }?.stopId
+
+                    items(sortedStops) { stop ->
                         StopItem(
                             stop = stop,
+                            isActive = stop.stopId == activeStopId,
                             onUpdateStatus = { status ->
                                 viewModel.updateStopStatus(stop.stopId, jobId, status)
                             },
@@ -85,7 +114,7 @@ fun StopDetailsScreen(
 }
 
 @Composable
-fun JobDetailsCard(job: JobResponse) {
+fun JobDetailsCard(job: JobResponse, onStartJob: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -128,6 +157,17 @@ fun JobDetailsCard(job: JobResponse) {
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+
+            // Only Assigned -> EnRoute is a valid driver-initiated transition on the backend.
+            if (job.status == "Assigned") {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onStartJob,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Start Job")
+                }
+            }
         }
     }
 }
@@ -135,6 +175,7 @@ fun JobDetailsCard(job: JobResponse) {
 @Composable
 fun StopItem(
     stop: StopResponse,
+    isActive: Boolean,
     onUpdateStatus: (String) -> Unit,
     onCapturePod: () -> Unit
 ) {
@@ -149,7 +190,7 @@ fun StopItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = stop.address,
+                    text = "#${stop.sequenceNumber} ${stop.address}",
                     style = MaterialTheme.typography.titleMedium
                 )
                 StatusBadge(status = stop.status)
@@ -168,11 +209,19 @@ fun StopItem(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (stop.status == "Assigned") {
-                    Button(onClick = { onUpdateStatus("EnRoute") }) {
-                        Text("Start Delivery")
+                // Only the next stop in the dispatcher's sequence is actionable —
+                // stops must be completed in order.
+                if (!isActive && stop.status != "Completed" && stop.status != "Cancelled") {
+                    Text(
+                        text = "Waiting for earlier stops",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (isActive && stop.status == "Pending") {
+                    Button(onClick = { onUpdateStatus("Arrived") }) {
+                        Text("Mark Arrived")
                     }
-                } else if (stop.status == "EnRoute") {
+                } else if (isActive && stop.status == "Arrived") {
                     Button(onClick = onCapturePod) {
                         Text("Capture POD")
                     }

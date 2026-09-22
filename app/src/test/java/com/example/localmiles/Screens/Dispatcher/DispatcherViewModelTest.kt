@@ -2,6 +2,7 @@ package com.example.localmiles.Screens.Dispatcher
 
 import com.example.localmiles.Core.Data.Repository.JobRepository
 import com.example.localmiles.Core.Network.ApiService
+import com.example.localmiles.Core.Network.Dto.ClientListResponse
 import com.example.localmiles.Core.Network.Dto.DepotListResponse
 import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverListResponse
@@ -42,6 +43,9 @@ class DispatcherViewModelTest {
         Dispatchers.setMain(testDispatcher)
         jobRepository = mockk()
         api = mockk()
+        // loadDispatcherData always fetches per-job stop counts and the client list too.
+        coEvery { jobRepository.getStopsForJob(any()) } returns Result.Success(emptyList())
+        coEvery { api.getClients() } returns ClientListResponse(emptyList())
         viewModel = DispatcherViewModel(jobRepository, api)
     }
 

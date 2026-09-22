@@ -17,6 +17,9 @@ fun PodCaptureScreen(
 ) {
     var recipientName by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    var submitError by remember { mutableStateOf<String?>(null) }
+
+    val stop = viewModel.currentJobStops.find { it.stopId == stopId }
 
     Scaffold(
         topBar = {
@@ -48,23 +51,33 @@ fun PodCaptureScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            if (submitError != null) {
+                Text(
+                    text = submitError ?: "",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
             Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = {
-                    // In a real app, we'd capture photo/signature/GPS here.
-                    // For now, we stub GPS coordinates and submit.
+                    submitError = null
+                    // In a real app, we'd capture the device's live GPS here. We fall
+                    // back to the stop's own registered coordinates, since the backend
+                    // rejects any POD submitted more than 200m from the stop.
                     viewModel.submitPod(
                         stopId = stopId,
                         jobId = jobId,
                         recipientName = recipientName,
-                        latitude = -25.7479, // Pretoria stub
-                        longitude = 28.2293,
+                        latitude = stop?.latitude ?: 0.0,
+                        longitude = stop?.longitude ?: 0.0,
                         notes = notes,
                         photo = null,
-                        signature = null
+                        signature = null,
+                        onSuccess = onSuccess,
+                        onError = { message -> submitError = message },
                     )
-                    onSuccess()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = recipientName.isNotBlank() && !viewModel.isLoading
