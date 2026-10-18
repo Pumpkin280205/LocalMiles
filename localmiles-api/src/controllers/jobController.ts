@@ -225,6 +225,17 @@ export async function updateJob(req: Request, res: Response) {
   if (Object.keys(parsed.value).length === 0)
     return res.status(400).json({ error: 'No valid fields to update' });
 
+  // A full update may also carry a Status — hold it to the same transition
+  // rules as PATCH /jobs/:id/status so this route can't skip the lifecycle.
+  if (parsed.value.Status !== undefined) {
+    const { data: current, error: currentErr } = await supabase
+      .from(TABLE).select('Status').eq(PK, id).maybeSingle();
+    if (currentErr) return writeError(res, currentErr, 'Database error');
+    if (!current) return res.status(404).json({ error: 'Job not found' });
+    if (!isValidJobTransition(current.Status, parsed.value.Status))
+      return res.status(409).json({ error: `Cannot transition job from ${current.Status} to ${parsed.value.Status}` });
+  }
+
   const { data, error } = await supabase
     .from(TABLE)
     .update(parsed.value)
