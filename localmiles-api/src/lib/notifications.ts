@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient.js';
+import { pushNotifications } from './push.js';
 
 interface NotificationRow {
   UserId: number;
@@ -11,8 +12,10 @@ interface NotificationRow {
 //Best-effort bulk insert: logs and swallows errors so a notification failure never blocks the caller's actual mutation. */
 async function insertNotifications(rows: NotificationRow[]): Promise<void> {
   if (rows.length === 0) return;
-  const { error } = await supabase.from('Notification').insert(rows);
-  if (error) console.error('Failed to create notification(s):', error);
+  const { data, error } = await supabase.from('Notification').insert(rows).select();
+  if (error) { console.error('Failed to create notification(s):', error); return; }
+  // Stored in Postgres (the in-app inbox), then pushed live to the user's devices via FCM.
+  await pushNotifications(data ?? []);
 }
 
 //Active admin UserIds, for dispatcher-visibility notifications. */

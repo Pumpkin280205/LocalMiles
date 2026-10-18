@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
 import { parseId, writeError, posInt } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
+import { pushNotifications } from '../lib/push.js';
 
 const TABLE = 'Notification';
 const PK = 'NotificationId';
@@ -110,6 +111,7 @@ export async function createNotification(req: Request, res: Response) {
 
   const { data, error } = await supabase.from(TABLE).insert(rows).select();
   if (error) return writeError(res, error, 'Could not create notification');
+  await pushNotifications(data ?? []);
 
   if (single) return res.status(201).json({ notification: data?.[0] });
   return res.status(201).json({ notifications: data, count: data?.length ?? 0 });

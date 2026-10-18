@@ -67,6 +67,12 @@ import {
   getSync,
   retrySync,
 } from './controllers/syncController.js';
+import {
+  postMyLocation,
+  getJobDriverLocation,
+  getDriverLocationHistory,
+} from './controllers/locationController.js';
+import { registerToken, unregisterToken } from './controllers/deviceController.js';
 dotenv.config();
 
 const app = express();
@@ -109,6 +115,9 @@ app.delete('/api/depots/:id', requireRole(ROLE.ADMIN), deactivateDepot);
 // '/me' must be registered before '/:id' so it isn't captured as an id.
 app.get('/api/drivers', listDrivers);
 app.get('/api/drivers/me', getMyDriver);
+// Live location (Firestore): driver reports pings; admins read the history.
+app.post('/api/drivers/me/location', postMyLocation);
+app.get('/api/drivers/:id/location-history', requireRole(ROLE.ADMIN), getDriverLocationHistory);
 app.get('/api/drivers/:id', getDriver);
 app.post('/api/drivers', requireRole(ROLE.ADMIN), createDriver);
 app.patch('/api/drivers/:id', requireRole(ROLE.ADMIN), updateDriver);
@@ -133,6 +142,10 @@ app.delete('/api/jobs/:id', requireRole(ROLE.ADMIN), cancelJob);
 // Route optimisation: read-only, computed fresh each call (nothing persisted).
 // Assigned driver or admin only.
 app.get('/api/jobs/:id/route', getJobRoute);
+
+// Driver live location for a job (read from Firestore). Admin, or the job's
+// own driver/client; clients only while the job is Assigned/EnRoute.
+app.get('/api/jobs/:id/driver-location', getJobDriverLocation);
 
 // Delivery stops: nested under a job for list/create; flat for item ops.
 // Read = any auth; plan/edit/cancel = admin; status updates = assigned driver or admin.
@@ -160,6 +173,10 @@ app.post('/api/notifications/read-all', markAllRead);
 app.get('/api/notifications/:id', getNotification);
 app.patch('/api/notifications/:id', updateNotification);
 app.delete('/api/notifications/:id', deleteNotification);
+
+// Push devices (FCM): a user registers/removes their own phone's token.
+app.post('/api/devices/token', registerToken);
+app.delete('/api/devices/token', unregisterToken);
 
 // Offline sync: clients replay queued actions keyed by a client-generated UUID.
 // Duplicates (same UUID) are 
