@@ -1,4 +1,5 @@
 import { OAuth2Client } from 'google-auth-library';
+import { getFirebaseApp } from './firebase.js';
 
 /**
  * Identity extracted from a verified SSO ID token, normalised so the login
@@ -43,15 +44,8 @@ function getFirebaseAuth() {
   if (!FIREBASE_SERVICE_ACCOUNT) throw new Error('Firebase verifier not configured');
   if (!firebaseAuthPromise) {
     firebaseAuthPromise = (async () => {
-      const { initializeApp, cert, getApps } = await import('firebase-admin/app');
       const { getAuth } = await import('firebase-admin/auth');
-      const raw = FIREBASE_SERVICE_ACCOUNT.trim();
-      const json = raw.startsWith('{')
-        ? raw
-        : (await import('node:fs')).readFileSync(raw, 'utf8');
-      const creds = JSON.parse(json);
-      const app = getApps().length ? getApps()[0]! : initializeApp({ credential: cert(creds) });
-      return getAuth(app);
+      return getAuth(await getFirebaseApp());
     })();
   }
   return firebaseAuthPromise;
