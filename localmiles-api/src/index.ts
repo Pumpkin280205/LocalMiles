@@ -43,6 +43,7 @@ import {
   cancelStop,
 } from './controllers/stopController.js';
 import { getJobRoute } from './controllers/routeController.js';
+import { getDepotPerformance } from './controllers/reportController.js';
 import { updateMe, listUsers, updateUserRole } from './controllers/userController.js';
 import {
   podUpload,
@@ -77,6 +78,9 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+// Offline sync can carry base64 POD photos, Registered first: once a body
+// is parsed, the general parser below skips it.
+app.use('/api/sync', express.json({ limit: '25mb' }));
 app.use(express.json());
 
 // --- Public routes (no token required) ---
@@ -130,7 +134,7 @@ app.post('/api/vehicles', requireRole(ROLE.ADMIN), createVehicle);
 app.patch('/api/vehicles/:id', requireRole(ROLE.ADMIN), updateVehicle);
 app.delete('/api/vehicles/:id', requireRole(ROLE.ADMIN), deactivateVehicle);
 
-// Jobs: read = any authenticated user; create/edit/cancel = admin;
+// Jobs: read = admin, or the job's own driver/client; create/edit/cancel = admin;
 // status updates = the assigned driver or an admin.
 app.get('/api/jobs', listJobs);
 app.get('/api/jobs/:id', getJob);
@@ -142,6 +146,9 @@ app.delete('/api/jobs/:id', requireRole(ROLE.ADMIN), cancelJob);
 // Route optimisation: read-only, computed fresh each call (nothing persisted).
 // Assigned driver or admin only.
 app.get('/api/jobs/:id/route', getJobRoute);
+
+// Depot performance dashboard (user-defined feature 5): read-only KPIs for dispatchers.
+app.get('/api/reports/depot-performance', requireRole(ROLE.ADMIN), getDepotPerformance);
 
 // Driver live location for a job (read from Firestore). Admin, or the job's
 // own driver/client; clients only while the job is Assigned/EnRoute.
@@ -191,6 +198,13 @@ app.post('/api/sync/:id/retry', retrySync);
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (err?.name === 'MulterError') {
     return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  // express.json() errors: oversized or malformed bodies are client errors, not 500s.
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request body too large' });
+  }
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Malformed JSON body' });
   }
   console.error('Unhandled error:', err);
   return res.status(500).json({ error: 'Internal server error' });

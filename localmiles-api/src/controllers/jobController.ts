@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
-import { parseId, writeError, posInt, isIsoDate, driverIdForUser, clientIdForUser } from '../lib/db.js';
+import { parseId, writeError, posInt, isIsoDate, driverIdForUser, clientIdForUser, userCanAccessJob } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
+import { notifyJobAssigned, notifyJobCompleted, type JobForNotify } from '../lib/notifications.js';
 
 const TABLE = 'DeliveryJob';
 const PK = 'JobId';
@@ -31,6 +32,35 @@ const JOB_TRANSITIONS: Record<string, readonly string[]> = {
 //A same-status call is always a no-op; anything else must be a listed transition. */
 export function isValidJobTransition(from: string, to: string): boolean {
   return from === to || (JOB_TRANSITIONS[from]?.includes(to) ?? false);
+}
+
+//Columns needed to decide on, and send, a job notification. */
+const NOTIFY_COLUMNS = 'JobId, ClientId, DriverId, Status, ReferenceNumber';
+
+export type JobSnapshot = JobForNotify & { Status: string };
+
+/**
+ * Which notifications a job change should trigger, "assigned" fires when a job becomes 
+ * Assigned with a driver, or when an, Assigned job is handed to a different driver; 
+ * "completed" fires on the move into Completed. Pure, so it's unit-testable.
+ */
+export function jobNotificationEvents(before: JobSnapshot | null, after: JobSnapshot): ('assigned' | 'completed')[] {
+  const events: ('assigned' | 'completed')[] = [];
+  if (after.Status === 'Assigned' && after.DriverId !== null &&
+      (before === null || before.Status !== 'Assigned' || before.DriverId !== after.DriverId))
+    events.push('assigned');
+  if (after.Status === 'Completed' && before?.Status !== 'Completed')
+    events.push('completed');
+  return events;
+}
+
+//Send whatever notifications a job change calls for. Best-effort (the notify helpers never throw). */
+export async function notifyJobChange(before: JobSnapshot | null, after: JobSnapshot): Promise<void> {
+  for (const event of jobNotificationEvents(before, after)) {
+    console.log(`Job ${after.JobId}: sending '${event}' notifications`);
+    if (event === 'assigned') await notifyJobAssigned(after);
+    else await notifyJobCompleted(after);
+  }
 }
 
 interface JobFields {
@@ -156,16 +186,14 @@ export async function listJobs(req: Request, res: Response) {
     query = query.lte('ScheduledDate', new Date(q.scheduledTo as string).toISOString());
   }
 
-  if (q.mine === 'true') {
-    if (req.user!.role === ROLE.CLIENT) {
-      const clientId = await clientIdForUser(Number(req.user!.id));
-      if (clientId === null) return res.json({ jobs: [] });
-      query = query.eq('ClientId', clientId);
-    } else {
-      const driverId = await driverIdForUser(Number(req.user!.id));
-      if (driverId === null) return res.json({ jobs: [] });
-      query = query.eq('DriverId', driverId);
-    }
+  if (req.user!.role === ROLE.CLIENT) {
+    const clientId = await clientIdForUser(Number(req.user!.id));
+    if (clientId === null) return res.json({ jobs: [] });
+    query = query.eq('ClientId', clientId);
+  } else if (req.user!.role !== ROLE.ADMIN || q.mine === 'true') {
+    const driverId = await driverIdForUser(Number(req.user!.id));
+    if (driverId === null) return res.json({ jobs: [] });
+    query = query.eq('DriverId', driverId);
   }
 
   const limit = Math.min(Math.max(Number(q.limit) || 50, 1), 200);
@@ -177,14 +205,15 @@ export async function listJobs(req: Request, res: Response) {
   return res.json({ jobs: data, limit, offset });
 }
 
-//GET /api/jobs/:id — any authenticated user. */
+//GET /api/jobs/:id — admin, or the job's own driver/client. 
 export async function getJob(req: Request, res: Response) {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Invalid job id' });
 
   const { data, error } = await supabase.from(TABLE).select('*').eq(PK, id).maybeSingle();
   if (error) return writeError(res, error, 'Database error');
-  if (!data) return res.status(404).json({ error: 'Job not found' });
+  // 404 (not 403) for someone else's job, so job ids can't be probed.
+  if (!data || !(await userCanAccessJob(req, data))) return res.status(404).json({ error: 'Job not found' });
   return res.json({ job: data });
 }
 
@@ -212,6 +241,7 @@ export async function createJob(req: Request, res: Response) {
     .single();
   if (refErr) return writeError(res, refErr, 'Job created but could not assign a reference number');
 
+  await notifyJobChange(null, data);
   return res.status(201).json({ job: data });
 }
 
@@ -225,16 +255,17 @@ export async function updateJob(req: Request, res: Response) {
   if (Object.keys(parsed.value).length === 0)
     return res.status(400).json({ error: 'No valid fields to update' });
 
+  // Load the current row: needed for the transition check and to tell whether
+  // this update assigns or completes the job (which sends notifications).
+  const { data: current, error: currentErr } = await supabase
+    .from(TABLE).select(NOTIFY_COLUMNS).eq(PK, id).maybeSingle();
+  if (currentErr) return writeError(res, currentErr, 'Database error');
+  if (!current) return res.status(404).json({ error: 'Job not found' });
+
   // A full update may also carry a Status — hold it to the same transition
   // rules as PATCH /jobs/:id/status so this route can't skip the lifecycle.
-  if (parsed.value.Status !== undefined) {
-    const { data: current, error: currentErr } = await supabase
-      .from(TABLE).select('Status').eq(PK, id).maybeSingle();
-    if (currentErr) return writeError(res, currentErr, 'Database error');
-    if (!current) return res.status(404).json({ error: 'Job not found' });
-    if (!isValidJobTransition(current.Status, parsed.value.Status))
-      return res.status(409).json({ error: `Cannot transition job from ${current.Status} to ${parsed.value.Status}` });
-  }
+  if (parsed.value.Status !== undefined && !isValidJobTransition(current.Status, parsed.value.Status))
+    return res.status(409).json({ error: `Cannot transition job from ${current.Status} to ${parsed.value.Status}` });
 
   const { data, error } = await supabase
     .from(TABLE)
@@ -244,6 +275,7 @@ export async function updateJob(req: Request, res: Response) {
     .maybeSingle();
   if (error) return writeError(res, error, 'Could not update job');
   if (!data) return res.status(404).json({ error: 'Job not found' });
+  await notifyJobChange(current, data);
   return res.json({ job: data });
 }
 
@@ -256,7 +288,7 @@ export async function updateJobStatus(req: Request, res: Response) {
     return res.status(400).json({ error: `Status must be one of: ${JOB_STATUSES.join(', ')}` });
 
   const { data: job, error: getErr } = await supabase
-    .from(TABLE).select('JobId, DriverId, Status').eq(PK, id).maybeSingle();
+    .from(TABLE).select(NOTIFY_COLUMNS).eq(PK, id).maybeSingle();
   if (getErr) return writeError(res, getErr, 'Database error');
   if (!job) return res.status(404).json({ error: 'Job not found' });
 
@@ -274,6 +306,7 @@ export async function updateJobStatus(req: Request, res: Response) {
   const { data, error } = await supabase
     .from(TABLE).update({ Status }).eq(PK, id).select().maybeSingle();
   if (error) return writeError(res, error, 'Could not update job status');
+  if (data) await notifyJobChange(job, data);
   return res.json({ job: data });
 }
 

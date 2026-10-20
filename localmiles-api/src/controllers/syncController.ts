@@ -2,9 +2,10 @@ import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
 import { writeError, driverIdForUser } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
-import { JOB_STATUSES, isValidJobTransition } from './jobController.js';
+import { JOB_STATUSES, isValidJobTransition, notifyJobChange } from './jobController.js';
 import { STOP_STATUSES, isValidStopTransition } from './stopController.js';
-import { notifySyncIssue } from '../lib/notifications.js';
+import { parsePodInput, createPod, type PodFile } from './podController.js';
+import { notifySyncIssue, notifyDeliveryFailed } from '../lib/notifications.js';
 
 const TABLE = 'OfflineSyncAction';
 const PK = 'SyncActionId';
@@ -13,6 +14,10 @@ const MAX_BATCH = 50;
 //Kept in sync with the private constants in jobController / stopController. */
 const DRIVER_JOB_STATUSES = ['EnRoute', 'Completed'];
 const DRIVER_STOP_STATUSES = ['Arrived', 'Completed', 'Failed'];
+
+// Same per-file cap as the multipart POD upload.
+const MAX_POD_FILE_BYTES = 10 * 1024 * 1024;
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PG_UNIQUE_VIOLATION = '23505';
@@ -31,6 +36,32 @@ interface SyncAction {
 type ActionOutcome =
   | { SyncActionId: string; outcome: 'invalid'; error: string }
   | { SyncActionId: string; outcome: 'duplicate' | 'queued' | 'applied' | 'failed'; status: string; error?: string | undefined };
+
+/**
+ * Decode an offline POD image 
+ * Returns undefined when absent, or an error string.
+ */
+export function decodePodImage(raw: unknown, field: string): PodFile | undefined | string {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'object') return `Payload.${field} must be { Base64, MimeType }`;
+  let b64 = (raw as any).Base64;
+  let mime = (raw as any).MimeType;
+  if (typeof b64 !== 'string' || !b64) return `Payload.${field}.Base64 is required`;
+
+  const dataUrl = /^data:([^;]+);base64,/.exec(b64);
+  if (dataUrl) {
+    mime ??= dataUrl[1];
+    b64 = b64.slice(dataUrl[0].length);
+  }
+  b64 = b64.replace(/\s/g, '');
+  if (typeof mime !== 'string' || !mime.startsWith('image/')) return `Payload.${field}.MimeType must be an image type`;
+  if (!BASE64_RE.test(b64)) return `Payload.${field}.Base64 is not valid base64`;
+
+  const buffer = Buffer.from(b64, 'base64');
+  if (buffer.length === 0) return `Payload.${field} is empty`;
+  if (buffer.length > MAX_POD_FILE_BYTES) return `Payload.${field} is larger than 10 MB`;
+  return { buffer, mimetype: mime };
+}
 
 //Validate one raw action object from the request. */
 function parseAction(raw: any): { ok: true; value: SyncAction } | { ok: false; error: string } {
@@ -79,7 +110,7 @@ async function dispatch(
         return { status: 'Failed', error: `Payload.Status must be one of: ${JOB_STATUSES.join(', ')}` };
 
       const { data: job, error } = await supabase
-        .from('DeliveryJob').select('JobId, DriverId, Status').eq('JobId', entityId).maybeSingle();
+        .from('DeliveryJob').select('JobId, ClientId, DriverId, Status, ReferenceNumber').eq('JobId', entityId).maybeSingle();
       if (error) return { status: 'Failed', error: error.message };
       if (!job) return { status: 'Failed', error: 'Job not found' };
 
@@ -96,6 +127,8 @@ async function dispatch(
 
       const upd = await supabase.from('DeliveryJob').update({ Status }).eq('JobId', entityId);
       if (upd.error) return { status: 'Failed', error: upd.error.message };
+      // Same notifications as the live PATCH /jobs/:id/status (e.g. "Delivery completed").
+      await notifyJobChange(job, { ...job, Status });
       return { status: 'Completed', error: null };
     }
 
@@ -109,7 +142,10 @@ async function dispatch(
         return { status: 'Failed', error: 'Payload.FailureReason is required when Status is Failed' };
 
       const { data: stop, error } = await supabase
-        .from('DeliveryStop').select('StopId, Status, ArrivedAt, DeliveryJob(DriverId)').eq('StopId', entityId).maybeSingle();
+        .from('DeliveryStop')
+        .select('StopId, JobId, Status, ArrivedAt, DeliveryJob(DriverId, ClientId, ReferenceNumber)')
+        .eq('StopId', entityId)
+        .maybeSingle();
       if (error) return { status: 'Failed', error: error.message };
       if (!stop) return { status: 'Failed', error: 'Stop not found' };
 
@@ -135,6 +171,43 @@ async function dispatch(
       if (Status === 'Failed') patch.FailureReason = FailureReason.trim();
       const upd = await supabase.from('DeliveryStop').update(patch).eq('StopId', entityId);
       if (upd.error) return { status: 'Failed', error: upd.error.message };
+
+      // Same "delivery failed" notification as the live PATCH /stops/:id/status.
+      if (Status === 'Failed' && (stop as any).Status !== 'Failed') {
+        const job = (stop as any).DeliveryJob;
+        await notifyDeliveryFailed(
+          { JobId: (stop as any).JobId, ClientId: job.ClientId, DriverId: job.DriverId, ReferenceNumber: job.ReferenceNumber },
+          entityId,
+          FailureReason.trim()
+        );
+      }
+      return { status: 'Completed', error: null };
+    }
+
+    /**
+     * Proof of delivery captured offline.
+    */
+    case 'SubmitPod': {
+      if (!wantInt) return { status: 'Failed', error: 'EntityId must be a stop id' };
+      const parsed = parsePodInput(action.Payload);
+      if (!parsed.ok) return { status: 'Failed', error: parsed.error };
+
+      const photo = decodePodImage((action.Payload as any).Photo, 'Photo');
+      if (typeof photo === 'string') return { status: 'Failed', error: photo };
+      const signature = decodePodImage((action.Payload as any).Signature, 'Signature');
+      if (typeof signature === 'string') return { status: 'Failed', error: signature };
+
+      const { data: existingPod, error: podErr } = await supabase
+        .from('ProofOfDelivery').select('PodId').eq('StopId', entityId).maybeSingle();
+      if (podErr) return { status: 'Failed', error: podErr.message };
+      if (existingPod) {
+        console.log(`SubmitPod for stop ${entityId}: POD ${existingPod.PodId} already exists, treating as applied`);
+        return { status: 'Completed', error: null };
+      }
+
+      const result = await createPod(req.user!, entityId, parsed.value, { photo, signature });
+      if (!result.ok) return { status: 'Failed', error: result.error };
+      console.log(`SubmitPod for stop ${entityId}: created POD ${result.pod.PodId}`);
       return { status: 'Completed', error: null };
     }
 

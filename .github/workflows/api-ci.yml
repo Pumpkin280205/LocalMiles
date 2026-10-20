@@ -2,7 +2,6 @@ name: API CI
 
 on:
   push:
-    branches: [Backend-API]
   pull_request:
     branches: [Backend-API, main]
 
