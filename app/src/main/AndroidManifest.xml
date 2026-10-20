@@ -6,8 +6,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- osmdroid checks connectivity before downloading Live Map tiles. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Push notifications from the API (FCM); asked for at runtime. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Driver live location while a job is En Route (DriverLocationService). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
+        android:name=".LocalMilesApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -29,6 +37,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".Core.Notifications.LocalMilesMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".Core.Location.DriverLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Pushes that arrive while the app is in the background use this channel/icon. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="localmiles_updates" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
     </application>
 
 </manifest>

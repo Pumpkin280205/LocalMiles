@@ -8,6 +8,7 @@ import com.example.localmiles.Core.Network.ApiService
 import com.example.localmiles.Core.Network.Dto.ClientResponse
 import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
+import com.example.localmiles.Core.Network.Dto.JobDriverLocationResponse
 import com.example.localmiles.Core.Network.Dto.JobUpsertRequest
 import com.example.localmiles.Core.Network.Dto.StopResponse
 import com.example.localmiles.Core.Network.Dto.StopUpsertRequest
@@ -47,6 +48,8 @@ data class DispatcherUiState(
 
     val stopCounts: Map<Long, Int> = emptyMap(),
     val stopsByJob: Map<Long, List<StopResponse>> = emptyMap(),
+    // Latest GPS ping (from Firestore, via the API) per active job, keyed by JobId.
+    val driverLocations: Map<Long, JobDriverLocationResponse> = emptyMap(),
     // Short-lived confirmation shown after a successful action.
     val infoMessage: String? = null
 ) {
@@ -183,6 +186,7 @@ class DispatcherViewModel(
                 )
 
                 loadStopCounts(jobs.map { it.jobId })
+                loadDriverLocations(jobs)
 
             } catch (e: Exception) {
 
@@ -212,6 +216,33 @@ class DispatcherViewModel(
             _uiState.value = _uiState.value.copy(
                 stopsByJob = stops,
                 stopCounts = stops.mapValues { it.value.size }
+            )
+        }
+    }
+
+    /**
+     * Each on-the-road job's real driver position, for the Live Map. Best
+     * effort: a job whose driver hasn't sent a ping yet (404), or a server
+     * without Firestore configured (503), just falls back to the estimate.
+     */
+    private fun loadDriverLocations(jobs: List<JobResponse>) {
+
+        viewModelScope.launch {
+
+            val locations = jobs
+                .filter {
+                    it.driverId != null &&
+                        (it.status == JobStatus.EN_ROUTE || it.status == JobStatus.ASSIGNED)
+                }
+                .mapNotNull { job ->
+                    runCatching { api.getJobDriverLocation(job.jobId) }
+                        .getOrNull()
+                        ?.let { job.jobId to it }
+                }
+                .toMap()
+
+            _uiState.value = _uiState.value.copy(
+                driverLocations = locations
             )
         }
     }

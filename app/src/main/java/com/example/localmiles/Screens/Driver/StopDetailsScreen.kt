@@ -1,5 +1,8 @@
 package com.example.localmiles.Screens.Driver
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,13 +11,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.localmiles.Common.Components.AppTopBar
 import com.example.localmiles.Common.Components.KeepScreenOn
+import com.example.localmiles.Core.Location.DriverLocationService
 import com.example.localmiles.Core.Utils.DriverPreferences
+import com.example.localmiles.Core.Utils.JobStatus
 import com.example.localmiles.Core.Utils.NavigationLauncher
 import com.example.localmiles.Common.Components.LoadingIndicator
 import com.example.localmiles.Common.Components.StatusBadge
@@ -36,6 +44,47 @@ fun StopDetailsScreen(
     val driverSettings by DriverPreferences.settings.collectAsState()
 
     KeepScreenOn(enabled = driverSettings.keepScreenOn)
+
+    val trackingJobId by DriverLocationService.trackingJobId.collectAsState()
+    var locationDenied by remember { mutableStateOf(false) }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) {
+            locationDenied = false
+            DriverLocationService.start(context, jobId)
+        } else {
+            locationDenied = true
+        }
+    }
+
+    val requestLocation = {
+        locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    val jobStatus = viewModel.currentJob?.takeIf { it.jobId == jobId }?.status
+
+    // Share GPS with the dispatcher while this job is En Route; stop once it's finished.
+    LaunchedEffect(jobStatus) {
+        when {
+            jobStatus == JobStatus.EN_ROUTE ->
+                if (DriverLocationService.hasLocationPermission(context)) {
+                    DriverLocationService.start(context, jobId)
+                } else {
+                    requestLocation()
+                }
+
+            jobStatus != null && JobStatus.isClosed(jobStatus) &&
+                DriverLocationService.trackingJobId.value == jobId ->
+                DriverLocationService.stop(context)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -71,6 +120,16 @@ fun StopDetailsScreen(
                                 job = job,
                                 onStartJob = { viewModel.updateJobStatus(jobId, "EnRoute") },
                             )
+                        }
+
+                        if (job.status == JobStatus.EN_ROUTE) {
+                            item {
+                                LocationSharingCard(
+                                    sharing = trackingJobId == jobId,
+                                    denied = locationDenied,
+                                    onAllow = requestLocation
+                                )
+                            }
                         }
 
                         item {
@@ -127,6 +186,44 @@ fun StopDetailsScreen(
                             }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/** Tells the driver whether their position is reaching the dispatcher's Live Map. */
+@Composable
+private fun LocationSharingCard(sharing: Boolean, denied: Boolean, onAllow: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (sharing) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.errorContainer
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = when {
+                    sharing -> "Sharing your location with your dispatcher while this job is en route."
+                    denied -> "Location is off, so your dispatcher can't see where you are. Allow it in your phone's settings."
+                    else -> "Allow location so your dispatcher can see where you are."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+            if (!sharing && !denied) {
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(onClick = onAllow) {
+                    Text("Allow")
                 }
             }
         }

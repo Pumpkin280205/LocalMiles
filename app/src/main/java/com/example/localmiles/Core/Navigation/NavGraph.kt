@@ -14,11 +14,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
+import com.example.localmiles.Common.Components.RequestNotificationPermission
 import com.example.localmiles.Core.Data.Repository.DepotRepository
 import com.example.localmiles.Core.Data.Repository.DriverRepository
 import com.example.localmiles.Core.Data.Repository.JobRepository
 import com.example.localmiles.Core.Data.Repository.UserRepository
 import com.example.localmiles.Core.Network.RetrofitClient
+import com.example.localmiles.Core.Notifications.PushTokenRegistrar
 import com.example.localmiles.Core.Utils.SessionManager
 
 import com.example.localmiles.Screens.Auth.AuthViewModel
@@ -125,6 +127,8 @@ fun NavGraph(
                 dispatcherViewModel.loadDispatcherData()
             }
 
+            RequestNotificationPermission()
+
             DashboardScreen(
 
                 // ------------------------------------------------
@@ -208,6 +212,9 @@ fun NavGraph(
                 // ------------------------------------------------
 
                 onLogout = {
+
+                    // Stop pushes to this phone (needs the session, so first).
+                    PushTokenRegistrar.unregister(context)
 
                     // Clear the saved authentication token,
                     // user ID and role.
@@ -296,6 +303,7 @@ fun NavGraph(
                 },
 
                 onLogout = {
+                    PushTokenRegistrar.unregister(context)
                     sessionManager.clear()
 
                     nav.navigate(
@@ -658,6 +666,8 @@ fun NavGraph(
 
             val authViewModel: AuthViewModel = viewModel()
 
+            RequestNotificationPermission()
+
             DriverDashboardScreen(
 
                 onViewJobs = {
@@ -832,6 +842,8 @@ fun NavGraph(
                 )
 
             val authViewModel: AuthViewModel = viewModel()
+
+            RequestNotificationPermission()
 
             ClientDashboardScreen(
 

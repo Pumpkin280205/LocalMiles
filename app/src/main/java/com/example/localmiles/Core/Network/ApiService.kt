@@ -4,11 +4,17 @@ import com.example.localmiles.Core.Network.Dto.ClientListResponse
 import com.example.localmiles.Core.Network.Dto.DepotDetailResponse
 import com.example.localmiles.Core.Network.Dto.DepotListResponse
 import com.example.localmiles.Core.Network.Dto.DepotUpsertRequest
+import com.example.localmiles.Core.Network.Dto.DeviceTokenRegisterResponse
+import com.example.localmiles.Core.Network.Dto.DeviceTokenRequest
+import com.example.localmiles.Core.Network.Dto.DeviceTokenUnregisterResponse
 import com.example.localmiles.Core.Network.Dto.DriverDetailResponse
 import com.example.localmiles.Core.Network.Dto.DriverListResponse
 import com.example.localmiles.Core.Network.Dto.DriverUpsertRequest
+import com.example.localmiles.Core.Network.Dto.JobDriverLocationResponse
 import com.example.localmiles.Core.Network.Dto.JobStatusRequest
 import com.example.localmiles.Core.Network.Dto.JobUpsertRequest
+import com.example.localmiles.Core.Network.Dto.LocationPingRequest
+import com.example.localmiles.Core.Network.Dto.LocationPingResponse
 import com.example.localmiles.Core.Network.Dto.MarkAllReadResponse
 import com.example.localmiles.Core.Network.Dto.NotificationCreateRequest
 import com.example.localmiles.Core.Network.Dto.NotificationDeleteResponse
@@ -40,6 +46,8 @@ import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
+import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -337,6 +345,36 @@ interface ApiService {
     suspend fun deleteNotification(
         @Path("id") id: Long
     ): NotificationDeleteResponse
+
+    // ---------------------------------------------------- Push (FCM) devices ---
+
+    // Any signed-in user — call after login and whenever FCM issues a new token.
+    @POST("devices/token")
+    suspend fun registerDeviceToken(
+        @Body body: DeviceTokenRequest
+    ): DeviceTokenRegisterResponse
+
+    // Called on logout, after the session is cleared, so the JWT is passed
+    // explicitly. Retrofit's @DELETE can't carry a body, hence @HTTP.
+    @HTTP(method = "DELETE", path = "devices/token", hasBody = true)
+    suspend fun unregisterDeviceToken(
+        @Header("Authorization") authorization: String,
+        @Body body: DeviceTokenRequest
+    ): DeviceTokenUnregisterResponse
+
+    // ------------------------------------------------- Live location (Firestore) ---
+
+    // Driver only — one GPS ping while a job is En Route.
+    @POST("drivers/me/location")
+    suspend fun postMyLocation(
+        @Body body: LocationPingRequest
+    ): LocationPingResponse
+
+    // Admin, or the job's own driver/client — the driver's latest position.
+    @GET("jobs/{id}/driver-location")
+    suspend fun getJobDriverLocation(
+        @Path("id") jobId: Long
+    ): JobDriverLocationResponse
 
     // --------------------------------------------------------- Offline sync ---
 

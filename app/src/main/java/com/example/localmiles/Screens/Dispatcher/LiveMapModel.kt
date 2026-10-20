@@ -1,6 +1,7 @@
 package com.example.localmiles.Screens.Dispatcher
 
 import com.example.localmiles.Core.Network.Dto.DepotResponse
+import com.example.localmiles.Core.Network.Dto.JobDriverLocationResponse
 import com.example.localmiles.Core.Network.Dto.StopResponse
 import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Utils.Coordinates
@@ -9,11 +10,12 @@ import com.example.localmiles.Core.Utils.StopStatus
 
 /**
  * A job that's on the road (or about to be) as the Live Map shows it: where
- * its driver was last confirmed, and how far through its stops they are.
+ * its driver is, and how far through its stops they are.
  *
- * The API has no GPS feed, so a driver's position is their most recent
- * confirmed point — the last stop they arrived at or delivered, or the depot
- * if they haven't reached one yet. That's labelled honestly in the UI.
+ * The position is the driver's live GPS (sent by the driver app while En
+ * Route, stored in Firestore) when a recent ping exists. Otherwise it falls
+ * back to their most recent confirmed point — the last stop they arrived at or
+ * delivered, or the depot. [isLive] says which, and the label says so too.
  */
 data class ActiveDelivery(
     val job: JobResponse,
@@ -23,7 +25,30 @@ data class ActiveDelivery(
     val driverPosition: Coordinates?,
     val positionLabel: String,
     val depot: DepotResponse?,
+    val isLive: Boolean = false,
 )
+
+// Older pings are from a previous shift, not where the driver is now.
+const val LIVE_LOCATION_MAX_AGE_SECONDS = 30 * 60L
+
+/** The driver's live GPS position and label, or null if there's no recent ping. */
+fun livePosition(live: JobDriverLocationResponse?): Pair<Coordinates, String>? {
+    if (live == null) return null
+    val age = live.ageSeconds
+    if (age != null && age > LIVE_LOCATION_MAX_AGE_SECONDS) return null
+
+    val point = Coordinates(live.location.latitude, live.location.longitude)
+    if (!point.isPlottable()) return null
+
+    return point to "Live GPS · ${describeAge(age)}"
+}
+
+/** 42 -> "just now", 300 -> "5 min ago". */
+fun describeAge(seconds: Long?): String = when {
+    seconds == null -> "time unknown"
+    seconds < 60 -> "just now"
+    else -> "${seconds / 60} min ago"
+}
 
 /** Stops saved before geocoding existed sit at 0,0 — never draw those. */
 fun Coordinates.isPlottable(): Boolean =
@@ -64,7 +89,8 @@ fun buildActiveDeliveries(state: DispatcherUiState): List<ActiveDelivery> =
         .map { job ->
             val stops = state.stopsByJob[job.jobId].orEmpty().sortedBy { it.sequenceNumber }
             val depot = state.depots.firstOrNull { it.depotId == job.depotId }
-            val (position, label) = estimateDriverPosition(job, stops, depot)
+            val live = livePosition(state.driverLocations[job.jobId])
+            val (position, label) = live ?: estimateDriverPosition(job, stops, depot)
             ActiveDelivery(
                 job = job,
                 driverName = state.driverName(job.driverId),
@@ -73,5 +99,6 @@ fun buildActiveDeliveries(state: DispatcherUiState): List<ActiveDelivery> =
                 driverPosition = position,
                 positionLabel = label,
                 depot = depot,
+                isLive = live != null,
             )
         }

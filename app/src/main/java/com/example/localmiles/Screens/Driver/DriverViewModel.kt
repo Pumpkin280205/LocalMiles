@@ -9,8 +9,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.localmiles.Core.Data.Repository.JobRepository
 import com.example.localmiles.Core.Data.Repository.PodRepository
 import com.example.localmiles.Core.Data.Repository.StopRepository
+import com.example.localmiles.Core.Location.DriverLocationService
 import com.example.localmiles.Core.Network.Dto.StopResponse
 import com.example.localmiles.Core.Network.JobResponse
+import com.example.localmiles.Core.Utils.JobStatus
 import com.example.localmiles.Core.Utils.Result
 import com.example.localmiles.Core.Utils.SessionManager
 import kotlinx.coroutines.launch
@@ -89,6 +91,7 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
             when (val result = jobRepository.updateStatus(jobId, status)) {
                 is Result.Success -> {
                     currentJob = result.data
+                    if (JobStatus.isClosed(result.data.status)) stopSharingLocation(jobId)
                     // Refresh jobs list
                     loadMyJobs()
                 }
@@ -110,7 +113,9 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
                             stopsResult.data.isNotEmpty() &&
                             stopsResult.data.all { it.status == "Completed" }
                         ) {
-                            jobRepository.updateStatus(jobId, "Completed")
+                            if (jobRepository.updateStatus(jobId, "Completed") is Result.Success) {
+                                stopSharingLocation(jobId)
+                            }
                         }
                     }
                     // Refresh stops (and job) for current job
@@ -118,6 +123,13 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 is Result.Error -> error = result.message
             }
+        }
+    }
+
+    // The job is finished, so the dispatcher no longer needs the driver's position.
+    private fun stopSharingLocation(jobId: Long) {
+        if (DriverLocationService.trackingJobId.value == jobId) {
+            DriverLocationService.stop(getApplication())
         }
     }
 

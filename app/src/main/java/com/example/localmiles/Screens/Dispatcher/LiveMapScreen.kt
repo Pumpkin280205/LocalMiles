@@ -79,8 +79,8 @@ private val SOUTH_AFRICA = GeoPoint(-29.0, 25.0)
 /**
  * Dispatcher Live Map — a real OpenStreetMap map (osmdroid) showing depots,
  * the stops of every active job, the planned route between them, and each
- * en-route driver's last confirmed position. Refreshes on the interval set in
- * Dispatcher Settings.
+ * driver's live GPS position (or, without a recent ping, their last confirmed
+ * stop). Refreshes on the interval set in Dispatcher Settings.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -389,7 +389,10 @@ private fun OsmMap(
                     map.overlays.add(Marker(map).apply {
                         this.position = point
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        icon = dotDrawable(driverColor, sizePx = 52)
+                        // Solid for live GPS, faded for an estimate from stops/depot.
+                        icon = dotDrawable(driverColor, sizePx = 52).apply {
+                            if (!delivery.isLive) alpha = 140
+                        }
                         title = "${delivery.driverName} · Job #${delivery.job.jobId}"
                         snippet = delivery.positionLabel
                     })
@@ -475,7 +478,12 @@ private fun ActiveDeliveryCard(
                     Text(
                         text = delivery.positionLabel,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (delivery.isLive) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        fontWeight = if (delivery.isLive) FontWeight.SemiBold else null
                     )
                 }
                 StatusBadge(status = delivery.job.status)

@@ -1,11 +1,14 @@
 package com.example.localmiles.Screens.Dispatcher
 
 import com.example.localmiles.Core.Network.Dto.DepotResponse
+import com.example.localmiles.Core.Network.Dto.DriverLocationResponse
+import com.example.localmiles.Core.Network.Dto.JobDriverLocationResponse
 import com.example.localmiles.Core.Network.Dto.StopResponse
 import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Utils.Coordinates
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +45,41 @@ class LiveMapModelTest {
         val stops = listOf(stop(1, "Completed", lat = 0.0).copy(longitude = 0.0))
         val (position, _) = estimateDriverPosition(job(1, "EnRoute"), stops, depot)
         assertEquals(Coordinates(-29.86, 31.03), position)
+    }
+
+    private fun live(lat: Double, lng: Double, ageSeconds: Long?) = JobDriverLocationResponse(
+        jobId = 2,
+        location = DriverLocationResponse(driverId = 1, jobId = 2, latitude = lat, longitude = lng),
+        ageSeconds = ageSeconds,
+    )
+
+    @Test
+    fun `a recent GPS ping is used as the live position`() {
+        val (position, label) = livePosition(live(-29.70, 31.05, ageSeconds = 120))!!
+        assertEquals(Coordinates(-29.70, 31.05), position)
+        assertEquals("Live GPS · 2 min ago", label)
+    }
+
+    @Test
+    fun `stale or missing pings fall back to the estimate`() {
+        assertNull(livePosition(null))
+        assertNull(livePosition(live(-29.70, 31.05, ageSeconds = LIVE_LOCATION_MAX_AGE_SECONDS + 1)))
+        assertNull(livePosition(live(0.0, 0.0, ageSeconds = 10)))
+    }
+
+    @Test
+    fun `active deliveries prefer live GPS over the stop estimate`() {
+        val state = DispatcherUiState(
+            jobs = listOf(job(1, "EnRoute"), job(2, "EnRoute")),
+            depots = listOf(depot),
+            driverLocations = mapOf(2L to live(-29.70, 31.05, ageSeconds = 30)),
+        )
+        val byJob = buildActiveDeliveries(state).associateBy { it.job.jobId }
+
+        assertTrue(byJob.getValue(2).isLive)
+        assertEquals(Coordinates(-29.70, 31.05), byJob.getValue(2).driverPosition)
+        assertFalse(byJob.getValue(1).isLive)
+        assertEquals(Coordinates(-29.86, 31.03), byJob.getValue(1).driverPosition)
     }
 
     @Test
