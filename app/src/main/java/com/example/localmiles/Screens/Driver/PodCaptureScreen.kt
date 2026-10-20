@@ -6,6 +6,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.localmiles.Common.Components.AppTopBar
+import com.example.localmiles.Common.Components.KeepScreenOn
+import com.example.localmiles.Core.Utils.DriverPreferences
 
 @Composable
 fun PodCaptureScreen(
@@ -20,6 +22,9 @@ fun PodCaptureScreen(
     var submitError by remember { mutableStateOf<String?>(null) }
 
     val stop = viewModel.currentJobStops.find { it.stopId == stopId }
+    val driverSettings by DriverPreferences.settings.collectAsState()
+
+    KeepScreenOn(enabled = driverSettings.keepScreenOn)
 
     Scaffold(
         topBar = {

@@ -16,7 +16,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +40,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.localmiles.Common.Components.AppTopBar
+import com.example.localmiles.Common.Components.DashboardHeader
+import com.example.localmiles.Common.Components.SettingsAction
+import com.example.localmiles.Common.Components.StatusBadge
 import com.example.localmiles.Core.Network.JobResponse
 
 @Composable
@@ -57,43 +65,13 @@ fun ClientDashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
 
-        // LocalMiles header
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "LocalMiles",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        text = "Client Dashboard",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                        fontSize = 12.sp
-                    )
-                }
-
-                TextButton(onClick = onOpenSettings) {
-                    Text(
-                        text = "Settings",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+        AppTopBar(
+            title = "LocalMiles",
+            subtitle = "Client Dashboard",
+            actions = {
+                SettingsAction(onClick = onOpenSettings)
             }
-        }
+        )
 
         Column(
             modifier = Modifier
@@ -103,38 +81,11 @@ fun ClientDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "My Deliveries",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = "Track your shipments in real time.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                TextButton(onClick = onLogout) {
-                    Text(
-                        text = "Log out",
-                        color = MaterialTheme.colorScheme.tertiary,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
+            DashboardHeader(
+                title = "My Deliveries",
+                subtitle = "Track your shipments in real time.",
+                onLogout = onLogout
+            )
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -314,37 +265,6 @@ private fun DeliveryInformationRow(
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun StatusBadge(
-    status: String
-) {
-    val colorScheme = MaterialTheme.colorScheme
-
-    val (backgroundColor, contentColor) = when (status.lowercase()) {
-        "completed", "delivered" -> colorScheme.primary to colorScheme.onPrimary
-        "enroute", "en route", "inprogress", "in progress" -> colorScheme.secondary to colorScheme.onSecondary
-        "pending" -> colorScheme.tertiary to colorScheme.onTertiary
-        "cancelled", "failed" -> colorScheme.error to colorScheme.onError
-        else -> colorScheme.primaryContainer to colorScheme.onPrimaryContainer
-    }
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = backgroundColor
-    ) {
-        Text(
-            text = formatStatus(status),
-            modifier = Modifier.padding(
-                horizontal = 12.dp,
-                vertical = 6.dp
-            ),
-            color = contentColor,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold
         )
     }
 }

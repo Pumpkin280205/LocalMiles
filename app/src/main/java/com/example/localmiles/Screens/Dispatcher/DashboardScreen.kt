@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Map
@@ -34,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.localmiles.Common.Components.AppTopBar
+import com.example.localmiles.Common.Components.DashboardHeader
+import com.example.localmiles.Common.Components.SettingsAction
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,12 +64,9 @@ fun DashboardScreen(
     onUsersClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onLogout: () -> Unit = {},
-    onRefresh: () -> Unit = {}
+    onRefresh: () -> Unit = {},
+    onCreateJob: () -> Unit = {}
 ) {
-
-    var accountMenuExpanded by remember {
-        mutableStateOf(false)
-    }
 
     var showLogoutDialog by remember {
         mutableStateOf(false)
@@ -73,21 +74,9 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Dispatcher",
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Text(
-                            text = "Operations Dashboard",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
-                },
-
+            AppTopBar(
+                title = "Dispatcher",
+                subtitle = "Operations Dashboard",
                 actions = {
 
                     // ------------------------------------------------
@@ -104,54 +93,10 @@ fun DashboardScreen(
                     }
 
                     // ------------------------------------------------
-                    // Dispatcher account button
+                    // Settings (same cog as the Driver/Client dashboards)
                     // ------------------------------------------------
 
-                    Box {
-
-                        IconButton(
-                            onClick = {
-                                accountMenuExpanded = true
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = "Account"
-                            )
-                        }
-
-                        DropdownMenu(
-                            expanded = accountMenuExpanded,
-                            onDismissRequest = {
-                                accountMenuExpanded = false
-                            }
-                        ) {
-
-                            DropdownMenuItem(
-                                text = {
-                                    Text("Settings")
-                                },
-                                onClick = {
-
-                                    accountMenuExpanded = false
-
-                                    onSettingsClick()
-                                }
-                            )
-
-                            DropdownMenuItem(
-                                text = {
-                                    Text("Logout")
-                                },
-                                onClick = {
-
-                                    accountMenuExpanded = false
-
-                                    showLogoutDialog = true
-                                }
-                            )
-                        }
-                    }
+                    SettingsAction(onClick = onSettingsClick)
                 }
             )
         }
@@ -174,10 +119,10 @@ fun DashboardScreen(
             // OVERVIEW
             // ========================================================
 
-            Text(
-                text = "Overview",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+            DashboardHeader(
+                title = "Overview",
+                subtitle = "Today's jobs, drivers and deliveries.",
+                onLogout = { showLogoutDialog = true }
             )
 
             Row(
@@ -214,7 +159,7 @@ fun DashboardScreen(
 
                 DashboardStatCard(
                     modifier = Modifier.weight(1f),
-                    title = "Issues",
+                    title = "Need attention",
                     value = issuesCount.toString(),
                     icon = Icons.Default.Warning
                 )
@@ -235,8 +180,15 @@ fun DashboardScreen(
             )
 
             DashboardActionCard(
+                title = "New delivery job",
+                description = "Create a job, then add its stops in one flow.",
+                icon = Icons.Default.Add,
+                onClick = onCreateJob
+            )
+
+            DashboardActionCard(
                 title = "Jobs",
-                description = "Create, assign and manage delivery jobs.",
+                description = "Assign, dispatch and track delivery jobs.",
                 icon = Icons.Default.Assignment,
                 onClick = onJobsClick
             )
@@ -257,8 +209,8 @@ fun DashboardScreen(
 
             DashboardActionCard(
                 title = "Delivery History",
-                description = "Review completed deliveries and POD records.",
-                icon = Icons.Default.Assignment,
+                description = "Search and filter completed or cancelled deliveries.",
+                icon = Icons.Default.History,
                 onClick = onHistoryClick
             )
 
@@ -428,7 +380,7 @@ private fun DashboardActionCard(
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

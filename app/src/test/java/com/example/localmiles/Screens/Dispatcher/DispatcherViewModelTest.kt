@@ -7,6 +7,10 @@ import com.example.localmiles.Core.Network.Dto.DepotListResponse
 import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverListResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
+import com.example.localmiles.Core.Network.Dto.StopDetailResponse
+import com.example.localmiles.Core.Network.Dto.StopResponse
+import com.example.localmiles.Core.Network.Dto.UserAccountResponse
+import com.example.localmiles.Core.Network.Dto.UserListResponse
 import com.example.localmiles.Core.Network.Dto.VehicleDetailResponse
 import com.example.localmiles.Core.Network.Dto.VehicleListResponse
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
@@ -14,6 +18,7 @@ import com.example.localmiles.Core.Network.Dto.VehicleUpsertRequest
 import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Utils.Result
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,6 +29,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,6 +52,7 @@ class DispatcherViewModelTest {
         // loadDispatcherData always fetches per-job stop counts and the client list too.
         coEvery { jobRepository.getStopsForJob(any()) } returns Result.Success(emptyList())
         coEvery { api.getClients() } returns ClientListResponse(emptyList())
+        coEvery { api.getUsers() } returns UserListResponse(emptyList())
         viewModel = DispatcherViewModel(jobRepository, api)
     }
 
@@ -310,5 +317,111 @@ class DispatcherViewModelTest {
 
         assertTrue(successCalled)
         assertEquals("Isuzu", viewModel.uiState.value.vehicles.first { it.vehicleId == 3L }.make)
+    }
+
+    private fun sampleStop(stopId: Long, jobId: Long, sequence: Int, status: String = "Pending") = StopResponse(
+        stopId = stopId,
+        jobId = jobId,
+        sequenceNumber = sequence,
+        recipientName = "Recipient $sequence",
+        address = "$sequence Long St, Cape Town",
+        latitude = -33.92,
+        longitude = 18.42,
+        status = status,
+    )
+
+    private fun loadWith(jobs: List<JobResponse>) {
+        coEvery { jobRepository.getJobs(limit = any(), offset = any()) } returns Result.Success(jobs)
+        coEvery { api.getDrivers(active = true) } returns DriverListResponse(listOf(sampleDriver()))
+        coEvery { api.getVehicles() } returns VehicleListResponse(emptyList())
+        coEvery { api.getDepots(active = true) } returns DepotListResponse(listOf(sampleDepot()))
+        viewModel.loadDispatcherData()
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
+    @Test
+    fun `updateJobStatus refuses to dispatch a job that has no stops`() = runTest(testDispatcher) {
+        loadWith(listOf(sampleJob(jobId = 4, status = "Assigned").copy(driverId = 1)))
+
+        viewModel.updateJobStatus(jobId = 4, status = "EnRoute")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.errorMessage!!.contains("delivery stop"))
+        coVerify(exactly = 0) { jobRepository.updateStatus(any(), any()) }
+    }
+
+    @Test
+    fun `updateJobStatus refuses a transition the API would reject`() = runTest(testDispatcher) {
+        loadWith(listOf(sampleJob(jobId = 6, status = "Completed")))
+
+        viewModel.updateJobStatus(jobId = 6, status = "Pending")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.errorMessage!!.contains("can't be moved"))
+        coVerify(exactly = 0) { jobRepository.updateStatus(any(), any()) }
+    }
+
+    @Test
+    fun `updateJobStatus dispatches an assigned job that has a driver and stops`() = runTest(testDispatcher) {
+        coEvery { jobRepository.getStopsForJob(8) } returns Result.Success(listOf(sampleStop(1, 8, 1)))
+        loadWith(listOf(sampleJob(jobId = 8, status = "Assigned").copy(driverId = 1)))
+
+        coEvery { jobRepository.updateStatus(8, "EnRoute") } returns
+            Result.Success(sampleJob(jobId = 8, status = "EnRoute").copy(driverId = 1))
+
+        viewModel.updateJobStatus(jobId = 8, status = "EnRoute")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("EnRoute", viewModel.uiState.value.jobs.first { it.jobId == 8L }.status)
+        assertNotNull(viewModel.uiState.value.infoMessage)
+    }
+
+    @Test
+    fun `loadDispatcherData keeps stops in sequence order`() = runTest(testDispatcher) {
+        coEvery { jobRepository.getStopsForJob(2) } returns
+            Result.Success(listOf(sampleStop(11, 2, 2), sampleStop(10, 2, 1)))
+        loadWith(listOf(sampleJob(jobId = 2)))
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf(1, 2), state.stopsByJob[2]!!.map { it.sequenceNumber })
+        assertEquals(2, state.stopCounts[2])
+        assertEquals(3, state.nextStopSequence(2))
+    }
+
+    @Test
+    fun `driverName shows the driver user name instead of an id`() = runTest(testDispatcher) {
+        coEvery { api.getUsers() } returns UserListResponse(
+            listOf(UserAccountResponse(1, "thandi@test", "Thandi", "Mokoena", "driver", true, "2026-01-01", null))
+        )
+        loadWith(emptyList())
+
+        assertEquals("Thandi Mokoena", viewModel.uiState.value.driverName(1))
+        assertEquals("Unassigned", viewModel.uiState.value.driverName(null))
+    }
+
+    @Test
+    fun `createJob remembers the new job so stops can be added next`() = runTest(testDispatcher) {
+        coEvery { jobRepository.createJob(any()) } returns Result.Success(sampleJob(jobId = 77))
+
+        viewModel.createJob(1, 1, null, null, "2026-01-01T10:00:00+02:00", "Pending", "Normal", null, null, null)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(77L, viewModel.uiState.value.lastCreatedJobId)
+        viewModel.clearLastCreatedJob()
+        assertNull(viewModel.uiState.value.lastCreatedJobId)
+    }
+
+    @Test
+    fun `createStop adds the saved stop and bumps the count`() = runTest(testDispatcher) {
+        loadWith(listOf(sampleJob(jobId = 3)))
+        coEvery { api.createStop(3, any()) } returns StopDetailResponse(sampleStop(30, 3, 1))
+
+        var saved = false
+        viewModel.createStop(3, 1, "Recipient 1", "1 Long St", -33.92, 18.42, null) { saved = true }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(saved)
+        assertEquals(1, viewModel.uiState.value.stopCounts[3])
+        assertEquals(2, viewModel.uiState.value.nextStopSequence(3))
     }
 }

@@ -13,3 +13,6 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Personal VS Code launch task
+/.vscode/tasks.json

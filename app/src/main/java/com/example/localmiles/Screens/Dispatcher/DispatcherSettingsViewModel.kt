@@ -2,7 +2,9 @@ package com.example.localmiles.Screens.Dispatcher
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.localmiles.Core.Data.Repository.DepotRepository
 import com.example.localmiles.Core.Data.Repository.UserRepository
+import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.UserAccountResponse
 import com.example.localmiles.Core.Utils.Result
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,10 +18,13 @@ data class DispatcherSettingsUiState(
     val user: UserAccountResponse? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null,
+    // Active depots for the "default depot" preference.
+    val depots: List<DepotResponse> = emptyList(),
 )
 
 class DispatcherSettingsViewModel(
     private val userRepository: UserRepository,
+    private val depotRepository: DepotRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -130,6 +135,26 @@ class DispatcherSettingsViewModel(
                         successMessage = null
                     )
                 }
+            }
+        }
+    }
+
+    fun loadDepots() {
+
+        val repository = depotRepository ?: return
+
+        viewModelScope.launch {
+
+            when (val result = repository.getDepots(active = true)) {
+
+                is Result.Success -> {
+
+                    _uiState.value = _uiState.value.copy(
+                        depots = result.data
+                    )
+                }
+
+                is Result.Error -> Unit
             }
         }
     }

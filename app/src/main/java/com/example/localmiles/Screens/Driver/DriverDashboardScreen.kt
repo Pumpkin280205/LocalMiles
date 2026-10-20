@@ -3,10 +3,11 @@ package com.example.localmiles.Screens.Driver
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.localmiles.Common.Components.AppTopBar
+import com.example.localmiles.Common.Components.DashboardHeader
+import com.example.localmiles.Common.Components.SettingsAction
 
 @Composable
 fun DriverDashboardScreen(
@@ -16,41 +17,36 @@ fun DriverDashboardScreen(
 ) {
     Scaffold(
         topBar = {
-            AppTopBar(title = "Driver Dashboard")
+            AppTopBar(
+                title = "LocalMiles",
+                subtitle = "Driver Dashboard",
+                actions = {
+                    SettingsAction(onClick = onSettings)
+                }
+            )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(horizontal = 16.dp)
         ) {
-            Text(
-                text = "Welcome, Driver!",
-                style = MaterialTheme.typography.headlineMedium
+            Spacer(modifier = Modifier.height(20.dp))
+
+            DashboardHeader(
+                title = "Welcome, Driver!",
+                subtitle = "Your assigned deliveries are waiting.",
+                onLogout = onLogout
             )
-            Spacer(modifier = Modifier.height(32.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             Button(
                 onClick = onViewJobs,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("My Jobs")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = onSettings,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Settings")
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Logout")
             }
         }
     }

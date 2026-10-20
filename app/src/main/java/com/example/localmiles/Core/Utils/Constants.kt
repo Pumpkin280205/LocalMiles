@@ -17,6 +17,31 @@ object JobStatus {
 
     //The only transitions a driver (non-admin) may make on their own job. */
     val DRIVER_SETTABLE = listOf(EN_ROUTE, COMPLETED)
+
+    // Mirrors JOB_TRANSITIONS in the API's jobController, so the dispatcher is
+    // only ever offered a status change the server will accept (no more 409s).
+    private val TRANSITIONS = mapOf(
+        PENDING to listOf(ASSIGNED, CANCELLED),
+        ASSIGNED to listOf(EN_ROUTE, PENDING, CANCELLED),
+        EN_ROUTE to listOf(COMPLETED, CANCELLED),
+        COMPLETED to emptyList(),
+        CANCELLED to emptyList(),
+    )
+
+    fun nextStatuses(current: String): List<String> =
+        TRANSITIONS[current] ?: emptyList()
+
+    fun canTransition(from: String, to: String): Boolean =
+        from == to || to in nextStatuses(from)
+
+    fun isClosed(status: String): Boolean =
+        status == COMPLETED || status == CANCELLED
+
+    // "EnRoute" -> "En Route" for display.
+    fun label(status: String): String = when (status) {
+        EN_ROUTE -> "En Route"
+        else -> status
+    }
 }
 
 object JobPriority {

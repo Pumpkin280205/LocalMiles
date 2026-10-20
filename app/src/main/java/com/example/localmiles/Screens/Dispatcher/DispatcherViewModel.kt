@@ -3,15 +3,19 @@ package com.example.localmiles.Screens.Dispatcher
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.localmiles.Core.Data.Repository.JobRepository
+import com.example.localmiles.Core.Data.Repository.friendlyErrorMessage
 import com.example.localmiles.Core.Network.ApiService
 import com.example.localmiles.Core.Network.Dto.ClientResponse
 import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.JobUpsertRequest
+import com.example.localmiles.Core.Network.Dto.StopResponse
 import com.example.localmiles.Core.Network.Dto.StopUpsertRequest
+import com.example.localmiles.Core.Network.Dto.UserAccountResponse
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
 import com.example.localmiles.Core.Network.Dto.VehicleUpsertRequest
 import com.example.localmiles.Core.Network.JobResponse
+import com.example.localmiles.Core.Utils.JobStatus
 import com.example.localmiles.Core.Utils.Result
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,11 +35,73 @@ data class DispatcherUiState(
     val depots: List<DepotResponse> = emptyList(),
     val clients: List<ClientResponse> = emptyList(),
 
+    // Every account, so drivers/clients can be shown by name instead of "#12".
+    val users: List<UserAccountResponse> = emptyList(),
+
     val selectedJob: JobResponse? = null,
     val saveSuccessful: Boolean = false,
 
-    val stopCounts: Map<Long, Int> = emptyMap()
-)
+    // Set when createJob succeeds so the screen can carry the dispatcher
+    // straight on to adding that job's delivery stops.
+    val lastCreatedJobId: Long? = null,
+
+    val stopCounts: Map<Long, Int> = emptyMap(),
+    val stopsByJob: Map<Long, List<StopResponse>> = emptyMap(),
+    // Short-lived confirmation shown after a successful action.
+    val infoMessage: String? = null
+) {
+
+    fun driverName(driverId: Long?): String {
+        if (driverId == null) return "Unassigned"
+        val driver = drivers.firstOrNull { it.driverId == driverId }
+        val user = driver?.let { d -> users.firstOrNull { it.userId == d.userId } }
+        return when {
+            user != null -> "${user.firstName} ${user.lastName}".trim()
+            driver != null -> "Driver ${driver.employeeNumber}"
+            else -> "Driver #$driverId"
+        }
+    }
+
+    fun clientName(clientId: Long): String =
+        clients.firstOrNull { it.clientId == clientId }
+            ?.let { "${it.companyName} (${it.contactPerson})" }
+            ?: "Client #$clientId"
+
+    fun vehicleName(vehicleId: Long?): String {
+        if (vehicleId == null) return "Unassigned"
+        return vehicles.firstOrNull { it.vehicleId == vehicleId }
+            ?.let { "${it.registrationNumber} · ${it.make} ${it.model}" }
+            ?: "Vehicle #$vehicleId"
+    }
+
+    fun depotName(depotId: Long): String =
+        depots.firstOrNull { it.depotId == depotId }?.name ?: "Depot #$depotId"
+
+    /** Next free sequence number, so "Add stop" never asks the dispatcher to count. */
+    fun nextStopSequence(jobId: Long): Int =
+        (stopsByJob[jobId]?.maxOfOrNull { it.sequenceNumber } ?: (stopCounts[jobId] ?: 0)) + 1
+
+    /**
+     * Why a job can't move to [target] yet, or null if it can. Mirrors the
+     * server's transition table and adds the business rules a dispatcher would
+     * otherwise only discover from a failed request.
+     */
+    fun statusBlocker(job: JobResponse, target: String): String? {
+        if (!JobStatus.canTransition(job.status, target)) {
+            return "A ${JobStatus.label(job.status)} job can't be moved to ${JobStatus.label(target)}."
+        }
+        if (target == JobStatus.ASSIGNED && job.driverId == null) {
+            return "Assign a driver to Job #${job.jobId} (Edit) before marking it Assigned."
+        }
+        if (target == JobStatus.EN_ROUTE) {
+            if (job.driverId == null) return "Job #${job.jobId} has no driver yet."
+            if ((stopCounts[job.jobId] ?: 0) == 0) {
+                return "Add at least one delivery stop before dispatching Job #${job.jobId}."
+            }
+        }
+        return null
+    }
+}
 
 class DispatcherViewModel(
     private val jobRepository: JobRepository,
@@ -83,6 +149,10 @@ class DispatcherViewModel(
 
                 val clients = api.getClients().clients
 
+                // Names only — the screens fall back to IDs if this fails.
+                val users = runCatching { api.getUsers().users }
+                    .getOrDefault(_uiState.value.users)
+
                 val jobs = when (jobsResult) {
 
                     is Result.Success ->
@@ -108,6 +178,7 @@ class DispatcherViewModel(
                     vehicles = vehiclesResponse.vehicles,
                     depots = depotsResponse.depots,
                     clients = clients,
+                    users = users,
                     errorMessage = jobError
                 )
 
@@ -117,7 +188,7 @@ class DispatcherViewModel(
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = e.message ?: "Unable to load dispatcher data."
+                    errorMessage = friendlyErrorMessage(e)
                 )
             }
         }
@@ -131,14 +202,17 @@ class DispatcherViewModel(
 
         viewModelScope.launch {
 
-            val counts = jobIds.associateWith { jobId ->
+            val stops = jobIds.associateWith { jobId ->
                 when (val result = jobRepository.getStopsForJob(jobId)) {
-                    is Result.Success -> result.data.size
-                    is Result.Error -> 0
+                    is Result.Success -> result.data.sortedBy { it.sequenceNumber }
+                    is Result.Error -> emptyList()
                 }
             }
 
-            _uiState.value = _uiState.value.copy(stopCounts = counts)
+            _uiState.value = _uiState.value.copy(
+                stopsByJob = stops,
+                stopCounts = stops.mapValues { it.value.size }
+            )
         }
     }
 
@@ -225,6 +299,7 @@ class DispatcherViewModel(
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
                         saveSuccessful = true,
+                        lastCreatedJobId = result.data.jobId,
                         jobs = _uiState.value.jobs + result.data
                     )
                 }
@@ -322,6 +397,15 @@ class DispatcherViewModel(
         status: String
     ) {
 
+        val job = _uiState.value.jobs.firstOrNull { it.jobId == jobId }
+
+        if (job != null) {
+            _uiState.value.statusBlocker(job, status)?.let { reason ->
+                _uiState.value = _uiState.value.copy(errorMessage = reason)
+                return
+            }
+        }
+
         viewModelScope.launch {
 
             when (
@@ -334,6 +418,7 @@ class DispatcherViewModel(
                 is Result.Success -> {
 
                     _uiState.value = _uiState.value.copy(
+                        infoMessage = "Job #$jobId is now ${JobStatus.label(result.data.status)}.",
                         jobs = _uiState.value.jobs.map { job ->
 
                             if (job.jobId == jobId) {
@@ -401,6 +486,20 @@ class DispatcherViewModel(
         )
     }
 
+    fun clearInfoMessage() {
+
+        _uiState.value = _uiState.value.copy(
+            infoMessage = null
+        )
+    }
+
+    fun clearLastCreatedJob() {
+
+        _uiState.value = _uiState.value.copy(
+            lastCreatedJobId = null
+        )
+    }
+
 
     /**
      * Activates or deactivates a vehicle from Fleet Management.
@@ -433,7 +532,7 @@ class DispatcherViewModel(
             } catch (e: Exception) {
 
                 _uiState.value = _uiState.value.copy(
-                    errorMessage = e.message ?: "Unable to update vehicle."
+                    errorMessage = friendlyErrorMessage(e)
                 )
             }
         }
@@ -486,7 +585,7 @@ class DispatcherViewModel(
 
                 _uiState.value = _uiState.value.copy(
                     isSavingVehicle = false,
-                    errorMessage = e.message ?: "Unable to create vehicle."
+                    errorMessage = friendlyErrorMessage(e)
                 )
             }
         }
@@ -546,7 +645,7 @@ class DispatcherViewModel(
 
                 _uiState.value = _uiState.value.copy(
                     isSavingVehicle = false,
-                    errorMessage = e.message ?: "Unable to update vehicle."
+                    errorMessage = friendlyErrorMessage(e)
                 )
             }
         }
@@ -584,7 +683,7 @@ class DispatcherViewModel(
 
             try {
 
-                api.createStop(
+                val created = api.createStop(
                     jobId,
                     StopUpsertRequest(
                         sequenceNumber = sequenceNumber,
@@ -596,10 +695,15 @@ class DispatcherViewModel(
                     )
                 )
 
+                val stops = (_uiState.value.stopsByJob[jobId].orEmpty() + created.stop)
+                    .sortedBy { it.sequenceNumber }
+
                 _uiState.value = _uiState.value.copy(
                     isSavingStop = false,
+                    infoMessage = "Stop ${created.stop.sequenceNumber} added to Job #$jobId.",
+                    stopsByJob = _uiState.value.stopsByJob + (jobId to stops),
                     stopCounts = _uiState.value.stopCounts +
-                        (jobId to ((_uiState.value.stopCounts[jobId] ?: 0) + 1))
+                        (jobId to stops.size)
                 )
                 onSuccess()
 
@@ -607,7 +711,7 @@ class DispatcherViewModel(
 
                 _uiState.value = _uiState.value.copy(
                     isSavingStop = false,
-                    errorMessage = e.message ?: "Unable to add stop."
+                    errorMessage = friendlyErrorMessage(e)
                 )
             }
         }

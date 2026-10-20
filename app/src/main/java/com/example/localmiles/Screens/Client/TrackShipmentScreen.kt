@@ -1,5 +1,6 @@
 package com.example.localmiles.Screens.Client
 
+import com.example.localmiles.Common.Components.AppTopBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,43 +57,12 @@ fun TrackShipmentScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
 
-        // Top app bar
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer,
-            shadowElevation = 4.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onBack) {
-                    Text(
-                        text = "‹",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Normal
-                    )
-                }
-
-                Column {
-                    Text(
-                        text = "Track Shipment",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Text(
-                        text = "Delivery #$jobId",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
+        AppTopBar(
+            title = "Track Shipment",
+            subtitle = "Delivery #$jobId",
+            showBack = true,
+            onBack = onBack
+        )
 
         when {
             uiState.isLoading -> {

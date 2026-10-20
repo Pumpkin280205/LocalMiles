@@ -8,6 +8,7 @@ on:
 
 jobs:
   build-and-test:
+    name: App unit tests + debug build
     runs-on: ubuntu-latest
 
     steps:
@@ -38,3 +39,41 @@ jobs:
         with:
           name: unit-test-results
           path: app/build/reports/tests/testDebugUnitTest
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: localmiles-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  # The REST API lives on the Backend-API branch of this repo (localmiles-api/).
+  # Testing it here means every app change is checked against the API's
+  # status rules, auth middleware and request validation too.
+  api-tests:
+    name: REST API type-check + tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: localmiles-api
+
+    steps:
+      - name: Checkout Backend-API branch
+        uses: actions/checkout@v4
+        with:
+          ref: Backend-API
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: localmiles-api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Run API tests
+        run: npm test

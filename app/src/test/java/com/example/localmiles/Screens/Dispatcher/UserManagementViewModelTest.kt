@@ -45,6 +45,7 @@ class UserManagementViewModelTest {
         // it's opened — stub it once here so every test doesn't need to repeat it.
         coEvery { depotRepository.getDepots(active = true) } returns
             Result.Success(listOf(DepotResponse(1, "Main Depot", "1 Main Rd", 0.0, 0.0, null, true)))
+        coEvery { driverRepository.getDrivers() } returns Result.Success(emptyList())
         viewModel = UserManagementViewModel(userRepository, driverRepository, depotRepository)
     }
 
@@ -168,5 +169,53 @@ class UserManagementViewModelTest {
         assertEquals(Role.DRIVER, viewModel.uiState.value.users.first { it.userId == 7L }.role)
         assertNull(viewModel.uiState.value.pendingDriverPromotion)
         assertTrue(viewModel.uiState.value.errorMessage == null)
+    }
+
+    private fun sampleDriver(driverId: Long, userId: Long, employeeNumber: String = "EMP-0001", isActive: Boolean = true) =
+        DriverResponse(driverId, userId, 1, employeeNumber, "0821234567", "LIC$driverId", true, isActive)
+
+    @Test
+    fun `confirmPromoteToDriver flags a duplicate employee number without calling the API`() = runTest(testDispatcher) {
+        coEvery { driverRepository.getDrivers() } returns Result.Success(listOf(sampleDriver(1, userId = 99, employeeNumber = "EMP-0001")))
+        coEvery { userRepository.getUsers() } returns Result.Success(listOf(sampleUser(userId = 7)))
+        viewModel.loadUsers()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setRole(userId = 7, role = Role.DRIVER)
+
+        viewModel.confirmPromoteToDriver(depotId = 1, employeeNumber = "emp-0001", phoneNumber = "082 123 4567", licenceNumber = "ABC12345")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertNotNull(viewModel.uiState.value.driverFormErrors.employeeNumber)
+        coVerify(exactly = 0) { driverRepository.createDriver(any()) }
+    }
+
+    @Test
+    fun `promotion dialog suggests the next free employee number`() = runTest(testDispatcher) {
+        coEvery { driverRepository.getDrivers() } returns Result.Success(listOf(sampleDriver(1, userId = 99, employeeNumber = "EMP-0004")))
+        coEvery { userRepository.getUsers() } returns Result.Success(listOf(sampleUser(userId = 7)))
+        viewModel.loadUsers()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.setRole(userId = 7, role = Role.DRIVER)
+
+        assertEquals("EMP-0005", viewModel.uiState.value.suggestedEmployeeNumber)
+    }
+
+    @Test
+    fun `demoting a driver also deactivates their driver record`() = runTest(testDispatcher) {
+        val driver = sampleDriver(driverId = 5, userId = 3)
+        coEvery { driverRepository.getDrivers() } returns Result.Success(listOf(driver))
+        coEvery { userRepository.getUsers() } returns Result.Success(listOf(sampleUser(userId = 3, role = Role.DRIVER)))
+        viewModel.loadUsers()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coEvery { userRepository.updateUserRole(3, Role.CLIENT) } returns Result.Success(sampleUser(userId = 3, role = Role.CLIENT))
+        coEvery { driverRepository.deactivateDriver(5) } returns Result.Success(driver.copy(isActive = false))
+
+        viewModel.setRole(userId = 3, role = Role.CLIENT)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { driverRepository.deactivateDriver(5) }
+        assertEquals(false, viewModel.uiState.value.driverFor(3)!!.isActive)
     }
 }

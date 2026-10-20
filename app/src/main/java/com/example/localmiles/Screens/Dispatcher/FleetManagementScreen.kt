@@ -37,7 +37,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.localmiles.Common.Components.AppTopBar
 import com.example.localmiles.Core.Network.Dto.DepotResponse
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
@@ -75,21 +75,11 @@ fun FleetManagementScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Fleet Monitoring",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
+            AppTopBar(
+                title = "Fleet Management",
+                subtitle = "Drivers and vehicles",
+                showBack = true,
+                onBack = onBack,
                 actions = {
                     IconButton(
                         onClick = {
@@ -259,7 +249,9 @@ fun FleetManagementScreen(
 
                             FleetDriverCard(
                                 driver = driver,
-                                vehicle = vehicle
+                                vehicle = vehicle,
+                                name = uiState.driverName(driver.driverId),
+                                depotName = uiState.depotName(driver.depotId)
                             )
                         }
                     }
@@ -291,6 +283,7 @@ fun FleetManagementScreen(
 
                             FleetVehicleCard(
                                 vehicle = vehicle,
+                                depotName = uiState.depotName(vehicle.depotId),
                                 onToggleActive = { active ->
                                     viewModel.setVehicleActive(
                                         vehicleId = vehicle.vehicleId,
@@ -474,7 +467,9 @@ private fun FleetSummaryItem(
 @Composable
 private fun FleetDriverCard(
     driver: DriverResponse,
-    vehicle: VehicleResponse?
+    vehicle: VehicleResponse?,
+    name: String,
+    depotName: String
 ) {
     val statusText = when {
         !driver.isActive -> "Inactive"
@@ -517,7 +512,7 @@ private fun FleetDriverCard(
                         .padding(start = 12.dp)
                 ) {
                     Text(
-                        text = "Driver #${driver.driverId}",
+                        text = name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -555,7 +550,7 @@ private fun FleetDriverCard(
             )
 
             Text(
-                text = "Depot ID: ${driver.depotId}"
+                text = "Depot: $depotName"
             )
 
             if (vehicle != null) {
@@ -579,6 +574,7 @@ private fun FleetDriverCard(
 @Composable
 private fun FleetVehicleCard(
     vehicle: VehicleResponse,
+    depotName: String,
     onToggleActive: (Boolean) -> Unit,
     onEdit: () -> Unit
 ) {
@@ -658,7 +654,7 @@ private fun FleetVehicleCard(
             )
 
             Text(
-                text = "Depot ID: ${vehicle.depotId}"
+                text = "Depot: $depotName"
             )
 
             HorizontalDivider()

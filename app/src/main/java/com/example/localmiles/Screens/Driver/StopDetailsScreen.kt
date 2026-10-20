@@ -6,10 +6,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.localmiles.Common.Components.AppTopBar
+import com.example.localmiles.Common.Components.KeepScreenOn
+import com.example.localmiles.Core.Utils.DriverPreferences
+import com.example.localmiles.Core.Utils.NavigationLauncher
 import com.example.localmiles.Common.Components.LoadingIndicator
 import com.example.localmiles.Common.Components.StatusBadge
 import com.example.localmiles.Core.Network.Dto.StopResponse
@@ -25,6 +31,11 @@ fun StopDetailsScreen(
     LaunchedEffect(jobId) {
         viewModel.loadStopsForJob(jobId)
     }
+
+    val context = LocalContext.current
+    val driverSettings by DriverPreferences.settings.collectAsState()
+
+    KeepScreenOn(enabled = driverSettings.keepScreenOn)
 
     Scaffold(
         topBar = {
@@ -104,6 +115,15 @@ fun StopDetailsScreen(
                             },
                             onCapturePod = {
                                 onStopClick(stop.stopId)
+                            },
+                            onNavigate = {
+                                NavigationLauncher.navigateTo(
+                                    context = context,
+                                    latitude = stop.latitude,
+                                    longitude = stop.longitude,
+                                    label = stop.address,
+                                    app = driverSettings.navigationApp
+                                )
                             }
                         )
                     }
@@ -177,7 +197,8 @@ fun StopItem(
     stop: StopResponse,
     isActive: Boolean,
     onUpdateStatus: (String) -> Unit,
-    onCapturePod: () -> Unit
+    onCapturePod: () -> Unit,
+    onNavigate: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -218,6 +239,11 @@ fun StopItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else if (isActive && stop.status == "Pending") {
+                    // Opens the app chosen in Driver Settings → Navigation App.
+                    OutlinedButton(onClick = onNavigate) {
+                        Text("Navigate")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = { onUpdateStatus("Arrived") }) {
                         Text("Mark Arrived")
                     }

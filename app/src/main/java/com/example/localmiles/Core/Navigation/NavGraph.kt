@@ -35,6 +35,8 @@ import com.example.localmiles.Screens.Dispatcher.CreateJobScreen
 import com.example.localmiles.Screens.Dispatcher.DashboardScreen
 import com.example.localmiles.Screens.Dispatcher.DeliveryHistoryScreen
 import com.example.localmiles.Screens.Dispatcher.DispatcherSettingsScreen
+import com.example.localmiles.Core.Utils.DispatcherPreferences
+import com.example.localmiles.Core.Utils.JobStatus
 import com.example.localmiles.Screens.Dispatcher.DispatcherSettingsViewModel
 import com.example.localmiles.Screens.Dispatcher.DispatcherSettingsViewModelFactory
 import com.example.localmiles.Screens.Dispatcher.DispatcherViewModel
@@ -151,11 +153,10 @@ fun NavGraph(
                     )
                 },
 
+                // Open jobs that can't progress yet: no driver, or no stops to deliver.
                 issuesCount = dispatcherUiState.jobs.count { job ->
-                    job.status.equals(
-                        "Cancelled",
-                        ignoreCase = true
-                    )
+                    (job.status == JobStatus.PENDING || job.status == JobStatus.ASSIGNED) &&
+                        (job.driverId == null || (dispatcherUiState.stopCounts[job.jobId] ?: 0) == 0)
                 },
 
                 // ------------------------------------------------
@@ -232,6 +233,12 @@ fun NavGraph(
 
                 onRefresh = {
                     dispatcherViewModel.loadDispatcherData()
+                },
+
+                onCreateJob = {
+                    nav.navigate(
+                        Routes.DISPATCHER_CREATE_JOB
+                    )
                 }
             )
         }
@@ -258,7 +265,10 @@ fun NavGraph(
             val settingsViewModel: DispatcherSettingsViewModel =
                 viewModel(
                     factory = DispatcherSettingsViewModelFactory(
-                        userRepository = userRepository
+                        userRepository = userRepository,
+                        depotRepository = DepotRepository(
+                            session = sessionManager
+                        )
                     )
                 )
 
@@ -267,6 +277,36 @@ fun NavGraph(
 
                 onBack = {
                     nav.popBackStack()
+                },
+
+                onManageUsers = {
+                    nav.navigate(Routes.DISPATCHER_USERS)
+                },
+
+                onFleet = {
+                    nav.navigate(Routes.DISPATCHER_FLEET)
+                },
+
+                onLiveMap = {
+                    nav.navigate(Routes.DISPATCHER_LIVE_MAP)
+                },
+
+                onHistory = {
+                    nav.navigate(Routes.DISPATCHER_HISTORY)
+                },
+
+                onLogout = {
+                    sessionManager.clear()
+
+                    nav.navigate(
+                        Routes.LOGIN
+                    ) {
+                        popUpTo(0) {
+                            inclusive = true
+                        }
+
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -276,9 +316,14 @@ fun NavGraph(
         // DISPATCHER - JOB LIST
         // ========================================================
 
-        composable(Routes.DISPATCHER_JOBS) {
+        composable(Routes.DISPATCHER_JOBS) { backStackEntry ->
 
             val context = LocalContext.current
+
+            // Set by Create Job so the list opens Add Stop for the new job.
+            val addStopsForJobId by backStackEntry.savedStateHandle
+                .getStateFlow<Long?>(ADD_STOPS_FOR_JOB_KEY, null)
+                .collectAsState()
 
             val sessionManager = remember {
                 SessionManager(context)
@@ -322,6 +367,12 @@ fun NavGraph(
                             job.jobId
                         )
                     )
+                },
+
+                addStopsForJobId = addStopsForJobId,
+
+                onAddStopsPromptHandled = {
+                    backStackEntry.savedStateHandle[ADD_STOPS_FOR_JOB_KEY] = null
                 }
             )
         }
@@ -423,8 +474,24 @@ fun NavGraph(
                     nav.popBackStack()
                 },
 
-                onJobSaved = {
-                    nav.popBackStack()
+                onJobSaved = { createdJobId ->
+
+                    // Land on the Jobs list (reusing it if we came from there)
+                    // and, if enabled in Settings, open Add Stop for the new job.
+                    nav.navigate(Routes.DISPATCHER_JOBS) {
+                        popUpTo(Routes.DISPATCHER_CREATE_JOB) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+
+                    if (createdJobId != null &&
+                        DispatcherPreferences.settings.value.promptForStopsAfterCreate
+                    ) {
+                        nav.currentBackStackEntry
+                            ?.savedStateHandle
+                            ?.set(ADD_STOPS_FOR_JOB_KEY, createdJobId)
+                    }
                 }
             )
         }
@@ -879,3 +946,6 @@ private fun NavHostController.goToHome(
         launchSingleTop = true
     }
 }
+
+// savedStateHandle key: Create Job -> Jobs list "add stops for this job".
+private const val ADD_STOPS_FOR_JOB_KEY = "addStopsForJobId"

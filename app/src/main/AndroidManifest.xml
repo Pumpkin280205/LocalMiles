@@ -4,6 +4,8 @@
 
     <!-- Required for Retrofit/OkHttp to reach the LocalMiles API. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- osmdroid checks connectivity before downloading Live Map tiles. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"

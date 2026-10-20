@@ -2,10 +2,12 @@ package com.example.localmiles.Screens.Dispatcher
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.example.localmiles.Core.Data.Repository.DepotRepository
 import com.example.localmiles.Core.Data.Repository.UserRepository
 
 class DispatcherSettingsViewModelFactory(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val depotRepository: DepotRepository? = null
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -19,7 +21,8 @@ class DispatcherSettingsViewModelFactory(
             )
         ) {
             return DispatcherSettingsViewModel(
-                userRepository = userRepository
+                userRepository = userRepository,
+                depotRepository = depotRepository
             ) as T
         }
 

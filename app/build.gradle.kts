@@ -45,7 +45,7 @@ android {
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"${localProps.getProperty("API_BASE_URL") ?: "http://10.0.2.2:3000/api/"}\"",
+            "\"${localProps.getProperty("API_BASE_URL") ?: "//192.168.1.23:3000/api/"}\"",
         )
     }
 
@@ -129,6 +129,9 @@ dependencies {
     implementation("com.google.maps.android:maps-compose:6.4.1")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    // OpenStreetMap tiles for the dispatcher Live Map — no API key needed, so
+    // the map renders for every developer and marker out of the box.
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Image loading — POD photos, profile images
     implementation("io.coil-kt:coil-compose:2.7.0")
