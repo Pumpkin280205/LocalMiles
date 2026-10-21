@@ -53,6 +53,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.localmiles.BuildConfig
 import com.example.localmiles.Common.Components.AppTopBar
 import com.example.localmiles.Common.Components.ErrorState
 import com.example.localmiles.Common.Components.LoadingIndicator
@@ -75,6 +76,12 @@ import java.time.format.DateTimeFormatter
 
 // Default view: South Africa, until there's something to zoom to.
 private val SOUTH_AFRICA = GeoPoint(-29.0, 25.0)
+
+// OpenStreetMap's tile servers only serve apps that identify themselves; a
+// generic agent like "com.example.localmiles" gets an "Access blocked" image
+// for every tile. https://operations.osmfoundation.org/policies/tiles/
+private val MAP_USER_AGENT =
+    "LocalMiles/${BuildConfig.VERSION_NAME} (Android; PROG7314 student project)"
 
 /**
  * Dispatcher Live Map — a real OpenStreetMap map (osmdroid) showing depots,
@@ -299,12 +306,15 @@ private fun OsmMap(
     val mapView = remember {
         // osmdroid needs a user agent and a writable cache before the first MapView.
         Configuration.getInstance().apply {
-            userAgentValue = context.packageName
+            userAgentValue = MAP_USER_AGENT
             osmdroidBasePath = File(context.cacheDir, "osmdroid")
-            osmdroidTileCache = File(osmdroidBasePath, "tiles")
+            // New folder so tiles cached as "Access blocked" images aren't reused.
+            osmdroidTileCache = File(osmdroidBasePath, "tiles-v2")
         }
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
+            // Draw tiles at the phone's screen density so street names are readable.
+            isTilesScaledToDpi = true
             setMultiTouchControls(true)
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             minZoomLevel = 4.0
