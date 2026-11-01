@@ -1,3 +1,4 @@
+
 package com.example.localmiles.Screens.Auth
 
 import android.app.Activity
@@ -24,8 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.localmiles.R
 
 @Composable
 fun LoginScreen(
@@ -39,15 +42,22 @@ fun LoginScreen(
     LaunchedEffect(state) {
         when (val s = state) {
             is AuthUiState.Success -> onSignedIn(s.role)
+
             is AuthUiState.Error -> {
                 snackbar.showSnackbar(s.message)
                 viewModel.consumeError()
             }
+
             else -> Unit
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { pad ->
+    Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbar)
+        }
+    ) { pad ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -56,20 +66,35 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("LocalMiles", style = MaterialTheme.typography.headlineMedium)
+
+            Text(
+                text = "LocalMiles",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
             Spacer(Modifier.height(32.dp))
+
             if (state is AuthUiState.Loading) {
                 CircularProgressIndicator()
             } else {
-                Button(onClick = { context.findActivity()?.let(viewModel::signIn) }) {
-                    Text("Sign in with Google")
+                Button(
+                    onClick = {
+                        context.findActivity()?.let(viewModel::signIn)
+                    }
+                ) {
+                    Text(
+                        stringResource(R.string.sign_in_google)
+                    )
                 }
             }
         }
     }
 }
 
-/** Credential Manager needs an Activity context; LocalContext may be a wrapper. */
+/**
+ * Credential Manager needs an Activity context;
+ * LocalContext may be a wrapper.
+ */
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()

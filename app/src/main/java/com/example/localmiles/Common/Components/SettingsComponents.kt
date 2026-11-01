@@ -1,6 +1,8 @@
+
 package com.example.localmiles.Common.Components
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,21 +38,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import com.example.localmiles.Core.Auth.BiometricAuthManager
+import com.example.localmiles.Core.Utils.AppLanguageManager
+import com.example.localmiles.Core.Utils.BiometricPreferences
 import com.example.localmiles.Core.Utils.ThemeMode
 import com.example.localmiles.Core.Utils.ThemePreferences
+import com.example.localmiles.R
 
-// Device-level preferences every role shares. The file name predates the
-// shared screen (it started as the client's), so existing choices carry over.
 private const val SHARED_SETTINGS_PREFS = "localmiles_client_settings"
 
-/**
- * The one Settings screen layout used by every role. Every role gets the same
- * core sections (Language, Notifications, Appearance, Data Usage and the
- * LocalMiles footer); drivers and dispatchers add their own sections 
- */
 @Composable
 fun RoleSettingsScreen(
     subtitle: String,
@@ -62,17 +63,34 @@ fun RoleSettingsScreen(
     val context = LocalContext.current
 
     val preferences = remember {
-        context.getSharedPreferences(SHARED_SETTINGS_PREFS, Context.MODE_PRIVATE)
+        context.getSharedPreferences(
+            SHARED_SETTINGS_PREFS,
+            Context.MODE_PRIVATE
+        )
     }
 
     var selectedLanguage by remember {
-        mutableStateOf(preferences.getString("language", "English") ?: "English")
+        mutableStateOf(
+            AppLanguageManager.getSelectedLanguage(context)
+        )
     }
+
     var notificationsEnabled by remember {
-        mutableStateOf(preferences.getBoolean("notifications_enabled", true))
+        mutableStateOf(
+            preferences.getBoolean("notifications_enabled", true)
+        )
     }
+
     var dataSaverEnabled by remember {
-        mutableStateOf(preferences.getBoolean("data_saver_enabled", false))
+        mutableStateOf(
+            preferences.getBoolean("data_saver_enabled", false)
+        )
+    }
+
+    var biometricEnabled by remember {
+        mutableStateOf(
+            BiometricPreferences.isEnabled(context)
+        )
     }
 
     val themeMode by ThemePreferences.themeMode.collectAsState()
@@ -84,7 +102,7 @@ fun RoleSettingsScreen(
     ) {
 
         AppTopBar(
-            title = "Settings",
+            title = stringResource(R.string.settings),
             subtitle = subtitle,
             showBack = true,
             onBack = onBack
@@ -98,14 +116,14 @@ fun RoleSettingsScreen(
         ) {
 
             Text(
-                text = "Preferences",
+                text = stringResource(R.string.preferences),
                 color = MaterialTheme.colorScheme.onBackground,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "Manage your LocalMiles experience.",
+                text = stringResource(R.string.manage_experience),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
@@ -117,77 +135,184 @@ fun RoleSettingsScreen(
 
             // LANGUAGE
             SettingsSpacer()
+
             SettingsSection(
-                title = "Language",
-                description = "Choose your preferred app language."
+                title = stringResource(R.string.language),
+                description = stringResource(R.string.choose_language)
             ) {
-                listOf("English", "isiZulu").forEachIndexed { index, language ->
-                    if (index > 0) SettingsDivider()
+                listOf(
+                    "English" to R.string.english,
+                    "Afrikaans" to R.string.afrikaans,
+                    "isiZulu" to R.string.isizulu
+                ).forEachIndexed { index, (language, labelResource) ->
+
+                    if (index > 0) {
+                        SettingsDivider()
+                    }
+
                     SettingsRadioRow(
-                        label = language,
+                        label = stringResource(labelResource),
                         selected = selectedLanguage == language,
                         onSelected = {
                             selectedLanguage = language
-                            preferences.edit().putString("language", language).apply()
+
+                            AppLanguageManager.setLanguage(
+                                context,
+                                language
+                            )
                         }
                     )
                 }
             }
 
-            // NOTIFICATIONS
+            // SECURITY AND BIOMETRICS
             SettingsSpacer()
+
             SettingsSection(
-                title = "Notifications",
-                description = "Choose which updates you want to receive."
+                title = stringResource(R.string.security),
+                description = stringResource(R.string.security_description)
             ) {
                 SettingSwitchRow(
-                    title = "Delivery notifications",
+                    title = stringResource(R.string.biometric_login),
+                    description = stringResource(R.string.biometric_description),
+                    checked = biometricEnabled,
+                    onCheckedChange = { enabled ->
+
+                        if (!enabled) {
+                            BiometricPreferences.disable(context)
+                            biometricEnabled = false
+
+                        } else {
+                            val activity = context as? FragmentActivity
+
+                            if (activity == null) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        R.string.biometric_unavailable
+                                    ),
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                            } else {
+                                val biometricManager =
+                                    BiometricAuthManager(activity)
+
+                                if (!biometricManager.canAuthenticate()) {
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(
+                                            R.string.enrol_biometric
+                                        ),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+
+                                } else {
+                                    biometricManager.authenticate {
+                                            success,
+                                            errorMessage ->
+
+                                        if (success) {
+                                            BiometricPreferences.setEnabled(
+                                                context,
+                                                true
+                                            )
+
+                                            biometricEnabled = true
+
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(
+                                                    R.string.biometric_enabled
+                                                ),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                        } else if (errorMessage != null) {
+                                            Toast.makeText(
+                                                context,
+                                                errorMessage,
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            // NOTIFICATIONS
+            SettingsSpacer()
+
+            SettingsSection(
+                title = stringResource(R.string.notifications),
+                description = stringResource(R.string.notifications_description)
+            ) {
+                SettingSwitchRow(
+                    title = stringResource(R.string.delivery_notifications),
                     description = notificationsDescription,
                     checked = notificationsEnabled,
                     onCheckedChange = { enabled ->
                         notificationsEnabled = enabled
-                        preferences.edit().putBoolean("notifications_enabled", enabled).apply()
+
+                        preferences.edit()
+                            .putBoolean("notifications_enabled", enabled)
+                            .apply()
                     }
                 )
             }
 
             // APPEARANCE
             SettingsSpacer()
+
             SettingsSection(
-                title = "Appearance",
-                description = "Choose how LocalMiles looks on this device."
+                title = stringResource(R.string.appearance),
+                description = stringResource(R.string.appearance_description)
             ) {
                 listOf(
-                    "System default" to ThemeMode.SYSTEM,
-                    "Light" to ThemeMode.LIGHT,
-                    "Dark" to ThemeMode.DARK
-                ).forEachIndexed { index, (label, mode) ->
-                    if (index > 0) SettingsDivider()
+                    R.string.system_default to ThemeMode.SYSTEM,
+                    R.string.light to ThemeMode.LIGHT,
+                    R.string.dark to ThemeMode.DARK
+                ).forEachIndexed { index, (labelResource, mode) ->
+
+                    if (index > 0) {
+                        SettingsDivider()
+                    }
+
                     SettingsRadioRow(
-                        label = label,
+                        label = stringResource(labelResource),
                         selected = themeMode == mode,
-                        onSelected = { ThemePreferences.setThemeMode(mode) }
+                        onSelected = {
+                            ThemePreferences.setThemeMode(mode)
+                        }
                     )
                 }
             }
 
             // DATA USAGE
             SettingsSpacer()
+
             SettingsSection(
-                title = "Data Usage",
-                description = "Control how LocalMiles uses mobile data."
+                title = stringResource(R.string.data_usage),
+                description = stringResource(R.string.data_usage_description)
             ) {
                 SettingSwitchRow(
-                    title = "Data Saver",
-                    description = "Reduce background data usage on limited connections.",
+                    title = stringResource(R.string.data_saver),
+                    description = stringResource(R.string.data_saver_description),
                     checked = dataSaverEnabled,
                     onCheckedChange = { enabled ->
                         dataSaverEnabled = enabled
-                        preferences.edit().putBoolean("data_saver_enabled", enabled).apply()
+
+                        preferences.edit()
+                            .putBoolean("data_saver_enabled", enabled)
+                            .apply()
                     }
                 )
             }
 
+            // ROLE-SPECIFIC SETTINGS
             roleContent?.let {
                 SettingsSpacer()
                 it()
@@ -200,7 +325,7 @@ fun RoleSettingsScreen(
     }
 }
 
-// Section heading + rounded card, matching the original client settings style.
+// SETTINGS SECTION
 @Composable
 fun SettingsSection(
     title: String,
@@ -230,7 +355,9 @@ fun SettingsSection(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
     ) {
         Column {
             content()
@@ -238,9 +365,11 @@ fun SettingsSection(
     }
 }
 
-// Padding for free-form content (fields, chips, buttons) inside a [SettingsSection].
+// SETTINGS CARD BODY
 @Composable
-fun SettingsCardBody(content: @Composable () -> Unit) {
+fun SettingsCardBody(
+    content: @Composable () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -251,6 +380,7 @@ fun SettingsCardBody(content: @Composable () -> Unit) {
     }
 }
 
+// SETTINGS DIVIDER
 @Composable
 fun SettingsDivider() {
     HorizontalDivider(
@@ -259,6 +389,7 @@ fun SettingsDivider() {
     )
 }
 
+// SETTINGS RADIO ROW
 @Composable
 fun SettingsRadioRow(
     label: String,
@@ -284,11 +415,16 @@ fun SettingsRadioRow(
             text = label,
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 15.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            fontWeight = if (selected) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Normal
+            }
         )
     }
 }
 
+// SETTINGS SWITCH ROW
 @Composable
 fun SettingSwitchRow(
     title: String,
@@ -300,7 +436,9 @@ fun SettingSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) {
+                onCheckedChange(!checked)
+            }
             .padding(16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -340,7 +478,7 @@ fun SettingSwitchRow(
     }
 }
 
-// Tappable row that opens another screen (admin shortcuts etc.).
+// SETTINGS LINK ROW
 @Composable
 fun SettingsLinkRow(
     icon: ImageVector,
@@ -355,7 +493,12 @@ fun SettingsLinkRow(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -367,19 +510,27 @@ fun SettingsLinkRow(
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold
             )
+
             Text(
                 text = description,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null
+        )
     }
 }
 
-//Read-only label/value line, e.g. a driver's licence number.
+// SETTINGS INFO ROW
 @Composable
-fun SettingsInfoRow(label: String, value: String) {
+fun SettingsInfoRow(
+    label: String,
+    value: String
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -391,6 +542,7 @@ fun SettingsInfoRow(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )
+
         Text(
             text = value,
             color = MaterialTheme.colorScheme.onSurface,
@@ -400,11 +552,13 @@ fun SettingsInfoRow(label: String, value: String) {
     }
 }
 
+// SETTINGS SPACER
 @Composable
 fun SettingsSpacer() {
     Spacer(modifier = Modifier.height(24.dp))
 }
 
+// APP INFORMATION CARD
 @Composable
 private fun AppInfoCard() {
     Card(
@@ -414,7 +568,9 @@ private fun AppInfoCard() {
             containerColor = MaterialTheme.colorScheme.primaryContainer
         )
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
+        Column(
+            modifier = Modifier.padding(18.dp)
+        ) {
             Text(
                 text = "LocalMiles",
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -423,15 +579,17 @@ private fun AppInfoCard() {
             )
 
             Text(
-                text = "Deliver locally. Drive further.",
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                text = stringResource(R.string.local_miles_tagline),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                    alpha = 0.8f
+                ),
                 fontSize = 13.sp
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Secure • Reliable • Connected",
+                text = stringResource(R.string.local_miles_features),
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
