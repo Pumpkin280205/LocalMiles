@@ -1,6 +1,7 @@
 
 <resources>
     <string name="app_name">LocalMiles</string>
+    <string name="unlock_biometric">Ontsluit met biometrie</string>
     <string name="sign_in_google">Meld aan met Google</string>
     <string name="settings">Instellings</string>
     <string name="preferences">Voorkeure</string>

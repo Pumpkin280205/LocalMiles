@@ -1,6 +1,7 @@
 
 <resources>
     <string name="app_name">LocalMiles</string>
+    <string name="unlock_biometric">Unlock with biometrics</string>
     <string name="sign_in_google">Sign in with Google</string>
     <string name="settings">Settings</string>
     <string name="preferences">Preferences</string>

@@ -19,6 +19,7 @@
     <string name="biometric_unavailable">Ukuqinisekisa ngobuchwepheshe bomzimba akutholakali.</string>
     <string name="enrol_biometric">Sicela ubhalise izigxivizo zeminwe noma ubuso kuzilungiselelo zedivayisi yakho kuqala.</string>
     <string name="biometric_enabled">Ukungena ngemininingwane yomzimba kunikwe amandla.</string>
+    <string name="unlock_biometric">Vula nge-biometrics</string>
     <string name="sign_in_google">Ngena nge-Google</string>
     <string name="notifications">Izaziso</string>
     <string name="notifications_description">Khetha izibuyekezo ofuna ukuzithola.</string>

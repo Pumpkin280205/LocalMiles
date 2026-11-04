@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -28,6 +29,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.fragment.app.FragmentActivity
+import com.example.localmiles.Core.Auth.BiometricAuthManager
+import com.example.localmiles.Core.Notifications.PushTokenRegistrar
+import com.example.localmiles.Core.Utils.BiometricPreferences
 import com.example.localmiles.R
 
 @Composable
@@ -85,6 +90,26 @@ fun LoginScreen(
                     Text(
                         stringResource(R.string.sign_in_google)
                     )
+                }
+
+                // A session survives sign-out when biometric login is on.
+                val savedRole = remember { viewModel.currentRoleOrNull() }
+                if (savedRole != null && BiometricPreferences.isEnabled(context)) {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = {
+                            (context.findActivity() as? FragmentActivity)?.let { activity ->
+                                BiometricAuthManager(activity).authenticate { ok, _ ->
+                                    if (ok) {
+                                        PushTokenRegistrar.register(context)
+                                        onSignedIn(savedRole)
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Text(stringResource(R.string.unlock_biometric))
+                    }
                 }
             }
         }
