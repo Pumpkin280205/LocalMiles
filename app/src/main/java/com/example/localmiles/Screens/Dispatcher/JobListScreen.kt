@@ -335,16 +335,29 @@ fun JobListScreen(
                 jobForAddStop = null
             },
             onSave = { sequence, recipient, address, latitude, longitude, instructions, addAnother ->
-                viewModel.createStop(
-                    jobId = job.jobId,
-                    sequenceNumber = sequence,
-                    recipientName = recipient,
-                    address = address,
-                    latitude = latitude,
-                    longitude = longitude,
-                    instructions = instructions,
-                    onSuccess = { if (!addAnother) jobForAddStop = null }
-                )
+                if (isNewJobStopFlow) {
+                    // right after creating a job: new stops go on the way, before the delivery address
+                    viewModel.addStopOnTheWay(
+                        jobId = job.jobId,
+                        recipientName = recipient,
+                        address = address,
+                        latitude = latitude,
+                        longitude = longitude,
+                        instructions = instructions,
+                        onSuccess = { if (!addAnother) jobForAddStop = null }
+                    )
+                } else {
+                    viewModel.createStop(
+                        jobId = job.jobId,
+                        sequenceNumber = sequence,
+                        recipientName = recipient,
+                        address = address,
+                        latitude = latitude,
+                        longitude = longitude,
+                        instructions = instructions,
+                        onSuccess = { if (!addAnother) jobForAddStop = null }
+                    )
+                }
             }
         )
     }
@@ -494,6 +507,7 @@ private fun JobCard(
             }
 
             if (stopsExpanded) {
+                val destinationStop = stops.maxByOrNull { it.sequenceNumber }
                 stops.forEach { stop ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -505,7 +519,11 @@ private fun JobCard(
                             fontWeight = FontWeight.Bold
                         )
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(stop.recipientName, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                if (stops.size > 1 && stop == destinationStop) "${stop.recipientName} (destination)"
+                                else stop.recipientName,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
                             Text(
                                 stop.address,
                                 style = MaterialTheme.typography.bodySmall,
@@ -666,9 +684,9 @@ private fun AddStopDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         title = {
             Column {
-                Text(if (isNewJob) "Add stops to Job #${job.jobId}" else "Add stop to Job #${job.jobId}")
+                Text(if (isNewJob) "Stops on the way · Job #${job.jobId}" else "Add stop to Job #${job.jobId}")
                 Text(
-                    text = if (isNewJob) "Step 2 of 2 · $existingStops added so far"
+                    text = if (isNewJob) "Step 2 of 2 · optional. These come before the delivery address"
                     else "$existingStops stop(s) on this job",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -730,16 +748,18 @@ private fun AddStopDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = sequenceNumber,
-                    onValueChange = { sequenceNumber = it },
-                    label = { Text("Stop order") },
-                    supportingText = { Text("Drivers must complete stops in this order") },
-                    isError = parsedSequence == null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                if (!isNewJob) {
+                    OutlinedTextField(
+                        value = sequenceNumber,
+                        onValueChange = { sequenceNumber = it },
+                        label = { Text("Stop order") },
+                        supportingText = { Text("Drivers must complete stops in this order") },
+                        isError = parsedSequence == null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 OutlinedTextField(
                     value = instructions,

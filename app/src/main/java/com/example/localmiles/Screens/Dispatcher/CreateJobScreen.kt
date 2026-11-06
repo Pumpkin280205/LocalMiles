@@ -44,9 +44,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -56,10 +58,12 @@ import com.example.localmiles.Common.Components.PickerField
 import com.example.localmiles.Common.Components.StatusBadge
 import com.example.localmiles.Core.Network.Dto.DriverResponse
 import com.example.localmiles.Core.Network.Dto.VehicleResponse
+import com.example.localmiles.Core.Utils.AddressGeocoder
 import com.example.localmiles.Core.Utils.DateFormatting
 import com.example.localmiles.Core.Utils.DispatcherPreferences
 import com.example.localmiles.Core.Utils.JobPriority
 import com.example.localmiles.Core.Utils.JobStatus
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -98,6 +102,19 @@ fun CreateJobScreen(
     var notes by remember { mutableStateOf("") }
     var estimatedDistance by remember { mutableStateOf("") }
     var estimatedDuration by remember { mutableStateOf("") }
+
+    // delivery address (new jobs only): it becomes the job's last stop
+    var recipientName by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var stopInstructions by remember { mutableStateOf("") }
+    var manualLatitude by remember { mutableStateOf("") }
+    var manualLongitude by remember { mutableStateOf("") }
+    var showManualCoordinates by remember { mutableStateOf(false) }
+    var isLocating by remember { mutableStateOf(false) }
+    var addressNote by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     var submitted by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -150,6 +167,11 @@ fun CreateJobScreen(
 
     val clientError = submitted && clientId == null
     val depotError = submitted && depotId == null
+    val recipientError = submitted && !isEditMode && recipientName.isBlank()
+    val addressError = submitted && !isEditMode && address.isBlank()
+    val manualLat = manualLatitude.toDoubleOrNull()?.takeIf { it in -90.0..90.0 && it != 0.0 }
+    val manualLng = manualLongitude.toDoubleOrNull()?.takeIf { it in -180.0..180.0 && it != 0.0 }
+    val coordinatesError = showManualCoordinates && (manualLat == null || manualLng == null)
     val distanceError = estimatedDistance.isNotBlank() && (parsedDistance == null || parsedDistance < 0)
     val durationError = estimatedDuration.isNotBlank() && (parsedDuration == null || parsedDuration < 0)
 
@@ -167,7 +189,7 @@ fun CreateJobScreen(
         topBar = {
             AppTopBar(
                 title = if (isEditMode) "Edit Job #$jobId" else "New Delivery Job",
-                subtitle = if (isEditMode) "Update assignment and schedule" else "Step 1 of 2 · job details",
+                subtitle = if (isEditMode) "Update assignment and schedule" else "Step 1 of 2 · job and delivery address",
                 showBack = true,
                 onBack = onBack
             )
@@ -238,6 +260,85 @@ fun CreateJobScreen(
                             else -> null
                         }
                     )
+                }
+
+                if (!isEditMode) {
+                    FormSection(title = "Delivery address") {
+
+                        Text(
+                            text = "Where the job ends. You can add stops on the way to it in the next step.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedTextField(
+                            value = recipientName,
+                            onValueChange = { recipientName = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Recipient name *") },
+                            isError = recipientError,
+                            supportingText = if (recipientError) {{ Text("Who is this delivery for?") }} else null,
+                            singleLine = true
+                        )
+
+                        OutlinedTextField(
+                            value = address,
+                            onValueChange = {
+                                address = it
+                                addressNote = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Delivery address *") },
+                            isError = addressError,
+                            supportingText = {
+                                Text(
+                                    if (addressError) "Enter the delivery address"
+                                    else "Street, suburb and city, used to place it on the map"
+                                )
+                            }
+                        )
+
+                        if (showManualCoordinates) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = manualLatitude,
+                                    onValueChange = { manualLatitude = it },
+                                    modifier = Modifier.weight(1f),
+                                    label = { Text("Latitude") },
+                                    placeholder = { Text("-29.85") },
+                                    isError = manualLatitude.isNotBlank() && manualLat == null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
+                                    value = manualLongitude,
+                                    onValueChange = { manualLongitude = it },
+                                    modifier = Modifier.weight(1f),
+                                    label = { Text("Longitude") },
+                                    placeholder = { Text("31.02") },
+                                    isError = manualLongitude.isNotBlank() && manualLng == null,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                    singleLine = true
+                                )
+                            }
+                        } else {
+                            TextButton(onClick = { showManualCoordinates = true }) {
+                                Text("Enter coordinates manually")
+                            }
+                        }
+
+                        addressNote?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        OutlinedTextField(
+                            value = stopInstructions,
+                            onValueChange = { stopInstructions = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Instructions (optional)") },
+                            placeholder = { Text("e.g. Gate code 1234, leave at reception") }
+                        )
+                    }
                 }
 
                 FormSection(title = "Assignment") {
@@ -368,9 +469,9 @@ fun CreateJobScreen(
                         )
                         Text(
                             text = if (preferences.promptForStopsAfterCreate)
-                                "Next you'll add the delivery stops for this job."
+                                "Next you can add stops on the way to the delivery address."
                             else
-                                "Add delivery stops from the Jobs list after saving.",
+                                "Add stops on the way from the Jobs list after saving.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -403,6 +504,9 @@ fun CreateJobScreen(
                             if (client == null || depot == null || distanceError || durationError) {
                                 return@Button
                             }
+                            if (!isEditMode && (recipientName.isBlank() || address.isBlank() || coordinatesError)) {
+                                return@Button
+                            }
 
                             val isoDate = DateFormatting.toApi(scheduledDate, scheduledTime.hour, scheduledTime.minute)
 
@@ -422,24 +526,48 @@ fun CreateJobScreen(
                                     estimatedDurationMinutes = parsedDuration
                                 )
                             } else {
-                                viewModel.createJob(
-                                    clientId = client,
-                                    depotId = depot,
-                                    driverId = driverId,
-                                    vehicleId = vehicleId,
-                                    scheduledDate = isoDate,
-                                    status = resultingStatus,
-                                    priority = priority,
-                                    notes = notes.ifBlank { null },
-                                    estimatedDistanceKm = parsedDistance,
-                                    estimatedDurationMinutes = parsedDuration
-                                )
+                                // find the address on the map first, so a job is never saved without a usable destination
+                                scope.launch {
+                                    isLocating = true
+                                    val point = if (showManualCoordinates && manualLat != null && manualLng != null) {
+                                        com.example.localmiles.Core.Utils.Coordinates(manualLat, manualLng)
+                                    } else {
+                                        AddressGeocoder.geocode(context, address.trim())
+                                    }
+                                    isLocating = false
+
+                                    if (point == null) {
+                                        showManualCoordinates = true
+                                        addressNote = "Couldn't find that address on the map. Check it, or enter the coordinates."
+                                        return@launch
+                                    }
+
+                                    viewModel.createJob(
+                                        clientId = client,
+                                        depotId = depot,
+                                        driverId = driverId,
+                                        vehicleId = vehicleId,
+                                        scheduledDate = isoDate,
+                                        status = resultingStatus,
+                                        priority = priority,
+                                        notes = notes.ifBlank { null },
+                                        estimatedDistanceKm = parsedDistance,
+                                        estimatedDurationMinutes = parsedDuration,
+                                        destination = NewStop(
+                                            recipientName = recipientName.trim(),
+                                            address = address.trim(),
+                                            latitude = point.latitude,
+                                            longitude = point.longitude,
+                                            instructions = stopInstructions.trim().ifBlank { null }
+                                        )
+                                    )
+                                }
                             }
                         },
-                        enabled = !uiState.isSaving,
+                        enabled = !uiState.isSaving && !isLocating,
                         modifier = Modifier.weight(1.4f)
                     ) {
-                        if (uiState.isSaving) {
+                        if (uiState.isSaving || isLocating) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp
@@ -447,7 +575,7 @@ fun CreateJobScreen(
                         } else {
                             Icon(imageVector = Icons.Default.Save, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (isEditMode) "Save changes" else "Create & add stops")
+                            Text(if (isEditMode) "Save changes" else "Create job")
                         }
                     }
                 }

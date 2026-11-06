@@ -23,6 +23,23 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+// The delivery address typed in when a job is created. It becomes the job's last stop
+data class NewStop(
+    val recipientName: String,
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+    val instructions: String?
+)
+
+// Where a new "stop on the way" goes: just before the destination (the stop with the highest order)
+data class OnTheWayPlan(val destination: StopResponse?, val newSequence: Int)
+
+fun planOnTheWayStop(stops: List<StopResponse>): OnTheWayPlan {
+    val destination = stops.maxByOrNull { it.sequenceNumber }
+    return OnTheWayPlan(destination, destination?.sequenceNumber ?: 1)
+}
+
 data class DispatcherUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
@@ -297,7 +314,8 @@ class DispatcherViewModel(
         priority: String?,
         notes: String?,
         estimatedDistanceKm: Double?,
-        estimatedDurationMinutes: Int?
+        estimatedDurationMinutes: Int?,
+        destination: NewStop? = null
     ) {
 
         viewModelScope.launch {
@@ -327,11 +345,40 @@ class DispatcherViewModel(
 
                 is Result.Success -> {
 
+                    val job = result.data
+
+                    // save the delivery address as the job's first (and for now last) stop
+                    var firstStop: StopResponse? = null
+                    var stopError: String? = null
+                    if (destination != null) {
+                        try {
+                            firstStop = api.createStop(
+                                job.jobId,
+                                StopUpsertRequest(
+                                    sequenceNumber = 1,
+                                    recipientName = destination.recipientName,
+                                    address = destination.address,
+                                    latitude = destination.latitude,
+                                    longitude = destination.longitude,
+                                    instructions = destination.instructions
+                                )
+                            ).stop
+                        } catch (e: Exception) {
+                            stopError = "Job #${job.jobId} was created but its address could not be saved " +
+                                "(${friendlyErrorMessage(e)}). Add it from the Jobs list."
+                        }
+                    }
+
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
                         saveSuccessful = true,
-                        lastCreatedJobId = result.data.jobId,
-                        jobs = _uiState.value.jobs + result.data
+                        lastCreatedJobId = job.jobId,
+                        jobs = _uiState.value.jobs + job,
+                        stopsByJob = if (firstStop != null) _uiState.value.stopsByJob + (job.jobId to listOf(firstStop))
+                        else _uiState.value.stopsByJob,
+                        stopCounts = if (firstStop != null) _uiState.value.stopCounts + (job.jobId to 1)
+                        else _uiState.value.stopCounts,
+                        errorMessage = stopError
                     )
                 }
 
@@ -735,6 +782,70 @@ class DispatcherViewModel(
                     stopsByJob = _uiState.value.stopsByJob + (jobId to stops),
                     stopCounts = _uiState.value.stopCounts +
                         (jobId to stops.size)
+                )
+                onSuccess()
+
+            } catch (e: Exception) {
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingStop = false,
+                    errorMessage = friendlyErrorMessage(e)
+                )
+            }
+        }
+    }
+
+    /**
+     * Adds a stop on the way to the job's destination: it goes just before the last stop,
+     * and the last stop moves one place down so it stays the final one.
+     */
+    fun addStopOnTheWay(
+        jobId: Long,
+        recipientName: String,
+        address: String,
+        latitude: Double,
+        longitude: Double,
+        instructions: String?,
+        onSuccess: () -> Unit
+    ) {
+
+        viewModelScope.launch {
+
+            _uiState.value = _uiState.value.copy(
+                isSavingStop = true,
+                errorMessage = null
+            )
+
+            try {
+
+                val existing = _uiState.value.stopsByJob[jobId] ?: api.getStopsForJob(jobId).stops
+                val plan = planOnTheWayStop(existing)
+
+                // move the destination down first so two stops never share an order number
+                val movedDestination = plan.destination?.let {
+                    api.updateStop(it.stopId, StopUpsertRequest(sequenceNumber = it.sequenceNumber + 1)).stop
+                }
+
+                val created = api.createStop(
+                    jobId,
+                    StopUpsertRequest(
+                        sequenceNumber = plan.newSequence,
+                        recipientName = recipientName,
+                        address = address,
+                        latitude = latitude,
+                        longitude = longitude,
+                        instructions = instructions
+                    )
+                ).stop
+
+                val stops = (existing.filter { it.stopId != movedDestination?.stopId } +
+                    listOfNotNull(movedDestination, created)).sortedBy { it.sequenceNumber }
+
+                _uiState.value = _uiState.value.copy(
+                    isSavingStop = false,
+                    infoMessage = "Stop added on the way to ${stops.last().address}.",
+                    stopsByJob = _uiState.value.stopsByJob + (jobId to stops),
+                    stopCounts = _uiState.value.stopCounts + (jobId to stops.size)
                 )
                 onSuccess()
 
