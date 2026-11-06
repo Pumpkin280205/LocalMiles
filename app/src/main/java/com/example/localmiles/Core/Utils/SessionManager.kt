@@ -33,8 +33,8 @@ class SessionManager(context: Context) {
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()
 
-    // Wipe everything on logout, unless biometric login is on: then the session stays on the
-    // phone so the login screen can offer "Unlock with biometrics".
+    // Wipe everything on logout, unless biometric login is on. Then we keep the session
+    // so the login screen can show "Unlock with biometrics"
     fun clear() {
         if (BiometricPreferences.isEnabled(appContext)) return
         prefs.edit().clear().apply()

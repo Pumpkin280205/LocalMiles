@@ -1,5 +1,6 @@
 package com.example.localmiles.Core.Data.Local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.util.UUID
@@ -20,6 +21,10 @@ data class OfflineActionEntity(
     val entityId: Long,
     val actionType: String,
     val payload: String,
+
+    // who made the action, so another account doesn't send it
+    @ColumnInfo(defaultValue = "''")
+    val userId: String = "",
 
     val status: String = "Pending",
     val createdAt: Long = System.currentTimeMillis()

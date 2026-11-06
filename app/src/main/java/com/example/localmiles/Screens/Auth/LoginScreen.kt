@@ -92,7 +92,7 @@ fun LoginScreen(
                     )
                 }
 
-                // A session survives sign-out when biometric login is on.
+                // the session is kept after sign out when biometric login is on
                 val savedRole = remember { viewModel.currentRoleOrNull() }
                 if (savedRole != null && BiometricPreferences.isEnabled(context)) {
                     Spacer(Modifier.height(16.dp))

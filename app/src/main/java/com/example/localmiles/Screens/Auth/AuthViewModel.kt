@@ -1,5 +1,6 @@
 package com.example.localmiles.Screens.Auth
 
+import com.example.localmiles.Screens.Driver.Sync.OfflineQueueManager
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
@@ -50,6 +51,8 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                     is Result.Success -> {
                         // Link this phone to the account so the API's pushes reach it.
                         PushTokenRegistrar.register(getApplication())
+                        // send anything this account saved while it was offline
+                        OfflineQueueManager.schedule(getApplication())
                         _state.value = AuthUiState.Success(r.data.role)
                     }
                     is Result.Error -> _state.value = AuthUiState.Error(r.message)

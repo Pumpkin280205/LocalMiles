@@ -1,6 +1,18 @@
 package com.example.localmiles.Screens.Driver
 
+import android.Manifest
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
+import androidx.core.content.FileProvider
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -21,7 +33,68 @@ fun PodCaptureScreen(
     var notes by remember { mutableStateOf("") }
     var submitError by remember { mutableStateOf<String?>(null) }
 
+    val context = LocalContext.current
+    var photoFile by remember { mutableStateOf<java.io.File?>(null) }
+    val strokes = remember { mutableStateListOf<List<Offset>>() }
+    var padSize by remember { mutableStateOf(IntSize.Zero) }
+
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        photoFile = if (taken) downscalePhoto(podPhotoFile(context)) else photoFile
+    }
+
     val stop = viewModel.currentJobStops.find { it.stopId == stopId }
+
+    val scope = rememberCoroutineScope()
+    var locating by remember { mutableStateOf(false) }
+    var submitAfterPermission by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) {
+            submitAfterPermission = true
+        } else {
+            submitError = "Location permission is needed to prove you are at the stop."
+        }
+    }
+
+    // Send the phone's real location. The API rejects a POD more than 200 m from the stop
+    val submit: () -> Unit = {
+        submitError = null
+        scope.launch {
+            locating = true
+            val fix = currentPosition(context)
+            locating = false
+            if (fix == null) {
+                submitError = "Could not get your location. Move somewhere with a clear view of the sky and try again."
+                return@launch
+            }
+            val away = stop?.let { distanceMeters(fix.latitude, fix.longitude, it.latitude, it.longitude) }
+            if (away != null && away > MAX_POD_DISTANCE_METERS) {
+                submitError = "You are ${away.roundToInt()} m from this stop (max ${MAX_POD_DISTANCE_METERS.roundToInt()} m)."
+                return@launch
+            }
+            viewModel.submitPod(
+                stopId = stopId,
+                jobId = jobId,
+                recipientName = recipientName,
+                latitude = fix.latitude,
+                longitude = fix.longitude,
+                notes = notes,
+                photo = photoFile,
+                signature = renderSignature(context, strokes.toList(), padSize),
+                onSuccess = onSuccess,
+                onError = { message -> submitError = message },
+            )
+        }
+    }
+
+    LaunchedEffect(submitAfterPermission) {
+        if (submitAfterPermission) {
+            submitAfterPermission = false
+            submit()
+        }
+    }
     val driverSettings by DriverPreferences.settings.collectAsState()
 
     KeepScreenOn(enabled = driverSettings.keepScreenOn)
@@ -39,6 +112,7 @@ fun PodCaptureScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -56,6 +130,24 @@ fun PodCaptureScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            OutlinedButton(
+                onClick = {
+                    val uri: Uri = FileProvider.getUriForFile(
+                        context, "${context.packageName}.fileprovider", podPhotoFile(context)
+                    )
+                    takePhoto.launch(uri)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (photoFile == null) "Take photo (optional)" else "Photo added - retake")
+            }
+
+            Text("Recipient signature (optional)", style = MaterialTheme.typography.labelLarge)
+            SignaturePad(strokes = strokes, onSize = { padSize = it })
+            if (strokes.isNotEmpty()) {
+                TextButton(onClick = { strokes.clear() }) { Text("Clear signature") }
+            }
+
             if (submitError != null) {
                 Text(
                     text = submitError ?: "",
@@ -63,31 +155,22 @@ fun PodCaptureScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
-                    submitError = null
-                    // In a real app, we'd capture the device's live GPS here. We fall
-                    // back to the stop's own registered coordinates, since the backend
-                    // rejects any POD submitted more than 200m from the stop.
-                    viewModel.submitPod(
-                        stopId = stopId,
-                        jobId = jobId,
-                        recipientName = recipientName,
-                        latitude = stop?.latitude ?: 0.0,
-                        longitude = stop?.longitude ?: 0.0,
-                        notes = notes,
-                        photo = null,
-                        signature = null,
-                        onSuccess = onSuccess,
-                        onError = { message -> submitError = message },
-                    )
+                    if (hasLocationPermission(context)) {
+                        submit()
+                    } else {
+                        permissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = recipientName.isNotBlank() && !viewModel.isLoading
+                enabled = recipientName.isNotBlank() && !viewModel.isLoading && !locating
             ) {
-                if (viewModel.isLoading) {
+                if (viewModel.isLoading || locating) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary

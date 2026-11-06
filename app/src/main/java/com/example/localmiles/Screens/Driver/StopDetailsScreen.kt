@@ -1,5 +1,6 @@
 package com.example.localmiles.Screens.Driver
 
+import com.example.localmiles.Screens.Driver.Sync.SyncStatusBanner
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -88,11 +89,15 @@ fun StopDetailsScreen(
 
     Scaffold(
         topBar = {
+        Column {
             AppTopBar(
                 title = "Job #$jobId",
                 showBack = true,
                 onBack = onBack
             )
+            val sync by viewModel.syncSummary.collectAsState()
+            SyncStatusBanner(sync, viewModel::retryFailedSync, viewModel::dismissFailedSync)
+        }
         }
     ) { padding ->
         Box(

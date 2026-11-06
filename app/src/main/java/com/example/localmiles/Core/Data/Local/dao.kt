@@ -23,17 +23,22 @@ interface OfflineActionDao {
     // Retrieve actions waiting to be synchronised.
     @Query("""
         SELECT * FROM offline_actions
-        WHERE status = 'Pending'
+        WHERE status = 'Pending' AND userId = :userId
         ORDER BY createdAt ASC
     """)
-    suspend fun getPendingActions(): List<OfflineActionEntity>
+    suspend fun getPendingActions(userId: String): List<OfflineActionEntity>
+
+    // Actions the server rejected (so they can be retried)
+    @Query("SELECT * FROM offline_actions WHERE status = 'Failed' AND userId = :userId")
+    suspend fun getFailedActions(userId: String): List<OfflineActionEntity>
 
     // Observe all actions so the UI can display their sync status.
     @Query("""
         SELECT * FROM offline_actions
+        WHERE userId = :userId
         ORDER BY createdAt DESC
     """)
-    fun observeActions(): Flow<List<OfflineActionEntity>>
+    fun observeActions(userId: String): Flow<List<OfflineActionEntity>>
 
     // Update an action's synchronisation status.
     @Query("""
@@ -46,7 +51,14 @@ interface OfflineActionDao {
     // Count pending actions.
     @Query("""
         SELECT COUNT(*) FROM offline_actions
-        WHERE status = 'Pending'
+        WHERE status = 'Pending' AND userId = :userId
     """)
-    fun observePendingCount(): Flow<Int>
+    fun observePendingCount(userId: String): Flow<Int>
+
+    // Delete rows with a given status (used by Dismiss)
+    @Query("DELETE FROM offline_actions WHERE status = :status AND userId = :userId")
+    suspend fun deleteByStatus(status: String, userId: String)
+
+    @Query("DELETE FROM offline_actions WHERE id = :actionId")
+    suspend fun delete(actionId: String)
 }

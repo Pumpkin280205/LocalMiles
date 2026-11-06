@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import android.util.Base64
 import com.example.localmiles.Core.Data.Repository.JobRepository
 import com.example.localmiles.Core.Data.Repository.PodRepository
 import com.example.localmiles.Core.Data.Repository.StopRepository
@@ -15,14 +16,52 @@ import com.example.localmiles.Core.Network.JobResponse
 import com.example.localmiles.Core.Utils.JobStatus
 import com.example.localmiles.Core.Utils.Result
 import com.example.localmiles.Core.Utils.SessionManager
+import com.example.localmiles.Screens.Driver.Sync.OfflineQueueManager
+import com.example.localmiles.Screens.Driver.Sync.SyncSummary
+import com.example.localmiles.Screens.Driver.Sync.overlayJobs
+import com.example.localmiles.Screens.Driver.Sync.overlayStops
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.IOException
+import java.time.Instant
 
 class DriverViewModel(app: Application) : AndroidViewModel(app) {
     private val session = SessionManager(app)
     private val jobRepository = JobRepository(session)
     private val stopRepository = StopRepository(session)
     private val podRepository = PodRepository(session)
+    private val queue = OfflineQueueManager.create(app)
+
+    // Pending / failed / synced counts for the sync banner
+    val syncSummary = queue.observeSummary()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SyncSummary())
+
+    init {
+        // when queued actions finish syncing, reload so we show what the server has
+        viewModelScope.launch {
+            var lastPending = 0
+            queue.observeSummary().collect {
+                if (it.pending < lastPending) {
+                    loadMyJobs()
+                    currentJob?.let { job -> loadStopsForJob(job.jobId) }
+                }
+                lastPending = it.pending
+            }
+        }
+    }
+
+    fun dismissFailedSync() {
+        viewModelScope.launch { queue.dismissFailed() }
+    }
+
+    fun retryFailedSync() {
+        viewModelScope.launch { queue.retryFailed() }
+    }
+
+    // No internet (not a server error) means the action can wait in the offline queue
+    private fun Result.Error.isOffline() = cause is IOException
 
     var jobs by mutableStateOf<List<JobResponse>>(emptyList())
         private set
@@ -48,7 +87,7 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
             error = null
             when (val result = jobRepository.getJobs(mine = true)) {
                 is Result.Success -> {
-                    jobs = result.data
+                    jobs = overlayJobs(result.data, queue.pendingActions())
                     loadStopCounts(result.data.map { it.jobId })
                 }
                 is Result.Error -> error = result.message
@@ -74,12 +113,12 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
             error = null
 
             when (val jobResult = jobRepository.getJob(jobId)) {
-                is Result.Success -> currentJob = jobResult.data
+                is Result.Success -> currentJob = overlayJobs(listOf(jobResult.data), queue.pendingActions()).single()
                 is Result.Error -> error = jobResult.message
             }
 
             when (val result = stopRepository.getStopsForJob(jobId)) {
-                is Result.Success -> currentJobStops = result.data
+                is Result.Success -> currentJobStops = overlayStops(result.data, queue.pendingActions())
                 is Result.Error -> error = result.message
             }
             isLoading = false
@@ -95,7 +134,14 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
                     // Refresh jobs list
                     loadMyJobs()
                 }
-                is Result.Error -> error = result.message
+                is Result.Error -> if (result.isOffline()) {
+                    queue.enqueue("Job", jobId, "UpdateJobStatus", mapOf("Status" to status))
+                    currentJob = currentJob?.copy(status = status)
+                    jobs = jobs.map { if (it.jobId == jobId) it.copy(status = status) else it }
+                    if (JobStatus.isClosed(status)) stopSharingLocation(jobId)
+                } else {
+                    error = result.message
+                }
             }
         }
     }
@@ -121,8 +167,26 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
                     // Refresh stops (and job) for current job
                     loadStopsForJob(jobId)
                 }
-                is Result.Error -> error = result.message
+                is Result.Error -> if (result.isOffline()) {
+                    queue.enqueue("Stop", stopId, "UpdateStopStatus", mapOf("Status" to status))
+                    markStopLocally(stopId, jobId, status)
+                } else {
+                    error = result.message
+                }
             }
+        }
+    }
+
+    // Shows an offline change straight away. When every stop is done the job is queued as
+    // Completed too (same as when online)
+    private suspend fun markStopLocally(stopId: Long, jobId: Long, status: String) {
+        currentJobStops = currentJobStops.map { if (it.stopId == stopId) it.copy(status = status) else it }
+        if (status == "Completed" && currentJobStops.isNotEmpty() &&
+            currentJobStops.all { it.status == "Completed" }
+        ) {
+            queue.enqueue("Job", jobId, "UpdateJobStatus", mapOf("Status" to "Completed"))
+            currentJob = currentJob?.copy(status = "Completed")
+            stopSharingLocation(jobId)
         }
     }
 
@@ -163,7 +227,22 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
                     isLoading = false
                     onSuccess()
                 }
-                is Result.Error -> {
+                is Result.Error -> if (result.isOffline()) {
+                    // the API marks the stop Completed itself when it applies a SubmitPod
+                    val payload = mutableMapOf<String, Any>(
+                        "RecipientName" to recipientName,
+                        "Latitude" to latitude,
+                        "Longitude" to longitude,
+                        "CapturedAt" to Instant.now().toString(),
+                    )
+                    notes?.takeIf { it.isNotBlank() }?.let { payload["Notes"] = it }
+                    photo?.let { payload["Photo"] = it.toOfflineImage() }
+                    signature?.let { payload["Signature"] = it.toOfflineImage() }
+                    queue.enqueue("Stop", stopId, "SubmitPod", payload)
+                    markStopLocally(stopId, jobId, "Completed")
+                    isLoading = false
+                    onSuccess()
+                } else {
                     error = result.message
                     isLoading = false
                     onError(result.message)
@@ -172,3 +251,9 @@ class DriverViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 }
+
+// Offline POD images are sent inside the sync payload as { Base64, MimeType }
+private fun File.toOfflineImage() = mapOf(
+    "Base64" to Base64.encodeToString(readBytes(), Base64.NO_WRAP),
+    "MimeType" to if (extension.equals("png", ignoreCase = true)) "image/png" else "image/jpeg",
+)
