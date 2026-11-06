@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-variant only: this file lives in src/debug/res, so it is never packaged
+  into a release build. Plain HTTP is needed here to reach a teammate's local
+  dev API (emulator's 10.0.2.2, or a LAN IP set via API_BASE_URL in
+  local.properties).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "716896979957",
+    "project_id": "localmiles-9e884",
+    "storage_bucket": "localmiles-9e884.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:716896979957:android:d7e17787718832a242aebc",
+        "android_client_info": {
+          "package_name": "com.example.localmiles"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "716896979957-k1nobb3as9t0oli9d0kiqiblmhj7c136.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.localmiles",
+            "certificate_hash": "238db0b67028079983d8794f298a2c557dd45468"
+          }
+        },
+        {
+          "client_id": "716896979957-uv4otcorh0ile6p9164o16r81hofekb3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYjpIwOR0kumUoIoRndI1DuWHpWavYUuE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "716896979957-uv4otcorh0ile6p9164o16r81hofekb3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="local_miles_dark_teal">#004759</color>
+    <color name="local_miles_green">#018B58</color>
+    <color name="local_miles_lime">#8AC237</color>
+    <color name="local_miles_orange">#F28800</color>
+    <color name="local_miles_background">#F7F8F9</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

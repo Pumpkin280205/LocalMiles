@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- app icon: lime map pin on an orange road (teal background is set in the mipmap file) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- orange road -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M30,80Q54,92 78,80"
+        android:strokeColor="@color/local_miles_orange"
+        android:strokeLineCap="round"
+        android:strokeWidth="5" />
+
+    <!-- lime pin -->
+    <path
+        android:fillColor="@color/local_miles_lime"
+        android:pathData="M54,80L39.6,57.03A17,17 0 1,1 68.4,57.03Z" />
+
+    <!-- hole in the middle of the pin -->
+    <path
+        android:fillColor="@color/local_miles_dark_teal"
+        android:pathData="M47,48a7,7 0 1,0 14,0a7,7 0 1,0 -14,0z" />
+</vector>
