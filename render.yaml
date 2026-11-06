@@ -1,0 +1,27 @@
+# Render blueprint for the LocalMiles API.
+# Render dashboard: New > Blueprint > pick this repo and the Backend-API branch.
+services:
+  - type: web
+    name: localmiles-api
+    runtime: node
+    rootDir: localmiles-api
+    branch: Backend-API
+    plan: free
+    # dev dependencies are needed because the build runs tsc
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # secrets: fill these in on the Render dashboard (values are never committed)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
