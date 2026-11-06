@@ -1,10 +1,11 @@
 name: Android CI
 
 on:
+  # runs on every push to any branch, on tags and on pull requests
   push:
-    branches: [LocalMiles-App, main]
+    branches: ['**']
+    tags: ['**']
   pull_request:
-    branches: [LocalMiles-App, main]
 
 jobs:
   build-and-test:
@@ -45,6 +46,30 @@ jobs:
         with:
           name: localmiles-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # signs the release APK only if the secrets are set (see docs/RELEASE.md)
+      # if not, it builds unsigned which still shows the release build works
+      - name: Decode signing key (if configured)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.LOCALMILES_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "LOCALMILES_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build release APK
+        env:
+          LOCALMILES_KEYSTORE_PASSWORD: ${{ secrets.LOCALMILES_KEYSTORE_PASSWORD }}
+          LOCALMILES_KEY_ALIAS: ${{ secrets.LOCALMILES_KEY_ALIAS }}
+          LOCALMILES_KEY_PASSWORD: ${{ secrets.LOCALMILES_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: localmiles-release-apk
+          path: app/build/outputs/apk/release/*.apk
 
   # The REST API lives on the Backend-API branch of this repo (localmiles-api/).
   # Testing it here means every app change is checked against the API's

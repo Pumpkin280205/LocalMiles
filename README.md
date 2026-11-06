@@ -1,126 +1,236 @@
-# Activity 1: App Concept and API Proposal — Updated for Part 2
+<p align="center">
+  <img src="docs/branding/feature-graphic-1024x500.png" alt="LocalMiles" width="720">
+</p>
 
-**PROG7314 | Group Worksheet | Maximum 4 students**
+# LocalMiles — Technical Report
 
-> This is the original Part 1 concept worksheet, updated to reflect what was actually implemented for the Part 2 prototype. Sections that changed from the original proposal are marked **(Updated for Part 2)**.
+**PROG7314 (Programming 3D) | Portfolio of Evidence — Final POE | Version 2.0.0**
 
-video link - https://youtu.be/W0VLYsKjTDo
+[![Android CI](https://github.com/EMKNDN/emkndn-prog7314-2026-prog7314-poe-st10452806-anjormisser/actions/workflows/android-ci.yml/badge.svg)](https://github.com/EMKNDN/emkndn-prog7314-2026-prog7314-poe-st10452806-anjormisser/actions/workflows/android-ci.yml)
 
-unit testing pictures - 
-
-<img width="1920" height="1080" alt="Screenshot 2026-09-22 172719" src="https://github.com/user-attachments/assets/15c6860f-b5a0-40cf-9427-973842dd8905" />
-<img width="1920" height="1080" alt="Screenshot 2026-09-22 172743" src="https://github.com/user-attachments/assets/7def991c-c601-410b-a016-cd578b78c2e8" />
-
-
-## 1. Group and concept
-
-**Group members and student numbers:**
-
-Anjor Misser - ST10452806\
-Kiara Naidoo - ST10252256\
-Sayali Sookdeo - ST10458649\
-Iqra Nazir - ST10448362
-
-**Working app name:** ~~LocalMilesSA~~ **LocalMiles** *(Updated for Part 2 — the built app is named LocalMiles)*
-
-**Problem to be solved:**
-
-Small and medium logistics and courier operators in South Africa largely coordinate deliveries manually, using telephonic dispatch, WhatsApp groups, and paper waybills. This causes missed SLAs, disputed proof of delivery, duplicated or inefficient routes that waste fuel, poor real-time visibility for both dispatchers and clients, and reconciliation delays when drivers operate in areas with unreliable network coverage. There is no affordable, purpose-built tool that unifies dispatching, live fleet visibility, offline-capable proof of delivery and client tracking for smaller operators who cannot afford enterprise fleet-management platforms.
-
-**Target users:**
-
-- Depot dispatchers/fleet managers who assign and monitor delivery jobs.
-- Delivery drivers who execute multi-stop routes, often in low-connectivity areas.
-- Business clients (retailers and manufacturers) who outsource deliveries and need shipment visibility.
-
-## 2. Proposed mobile solution
-
-**Core solution — as implemented in Part 2:**
-
-LocalMiles is a single Android app with three role-based views — Dispatcher (admin), Driver, and Client — sharing one login and one backend. A dispatcher creates a delivery job and adds its delivery stops, in sequence, from the Jobs screen. The dispatcher then progresses the job through its status lifecycle (Pending → Assigned → EnRoute) and it appears on the assigned driver's job list. The driver opens the job, starts it, and works through its stops strictly in the dispatcher's sequence order — marking each stop Arrived, then capturing Proof of Delivery (photo/signature-ready, recipient name, GPS position, notes) before the next stop becomes actionable. Once every stop on a job is completed, the job itself auto-completes, and the linked client sees the updated status and stop-by-stop progress on their own Track Shipment screen.
-
-*(Updated for Part 2 — route optimisation, live push-notification-driven job assignment, and in-app driver–dispatcher chat are not yet built; the core dispatch → drive → track loop above is what's implemented and demonstrated.)*
-
-**Why Android?**
-
-- Native Camera and Location APIs for proof-of-delivery capture (photo + GPS-verified stop location — the backend rejects a POD submitted more than 200m from its registered stop).
-- Local persistence (Room database) used for the driver-side offline sync groundwork (`OfflineQueueManager`, `SyncWorker`) — full offline-mode with automatic conflict-resolved sync is targeted for the final POE, not required for Part 2.
-- Jetpack Compose throughout, for a single consistent, role-adaptive UI without a legacy XML/Compose split.
-- Firebase Authentication via Google Sign-In (Credential Manager) for SSO, shared across all three roles from one account system.
-
-**Positive impact:** unchanged from the original proposal — reduces delivery disputes through an auditable, sequenced delivery record; improves visibility for clients without needing to phone the depot; and gives small operators access to structured dispatch tooling without enterprise pricing.
-
-## 3. Custom REST API *(Updated for Part 2)*
-
-The API stores and manages depots, vehicles, drivers, clients, users, delivery jobs, delivery stops, and Proof of Delivery records. It is the single source of truth reconciling dispatcher, driver and client views, and it enforces the app's real business rules server-side.
-
-**API responsibilities and business logic, as implemented:**
-
-- Authenticating users via Firebase-verified SSO and issuing a scoped session JWT (`admin` / `driver` / `client` roles).
-- Enforcing valid job and stop status transitions server-side (e.g. a job can only reach `Completed` from `EnRoute`; a stop only from `Arrived`) — rejecting invalid jumps with a 409.
-- Enforcing a GPS-proximity check on Proof of Delivery submission: a driver's submitted location must be within 200m of the stop's registered coordinates, or the submission is rejected.
-- Linking every self-registered client user to a `Client` record automatically on first login, so a dispatcher can immediately assign jobs to them.
-- Scoping job visibility by role — a driver or client can only see their own jobs via `GET /api/jobs?mine=true`.
-
-**Endpoints actually implemented (subset most relevant to Part 2):**
-
-| # | Method and route | Purpose |
-|---|---|---|
-| 1 | `POST /api/auth/login` | Authenticate a user via Firebase-verified SSO and return a session JWT. |
-| 2 | `GET /api/jobs?mine=true` | Retrieve the delivery jobs assigned to (or owned by) the current driver/client. |
-| 3 | `POST /api/jobs` | Create a new delivery job (dispatcher only). |
-| 4 | `PATCH /api/jobs/{id}/status` | Transition a job's status (e.g. Assigned → EnRoute → Completed), validated server-side. |
-| 5 | `POST /api/jobs/{jobId}/stops` | Add a delivery stop to a job, in sequence (dispatcher only). |
-| 6 | `PATCH /api/stops/{id}/status` | Transition a stop's status (Pending → Arrived → Completed), validated server-side. |
-| 7 | `POST /api/stops/{stopId}/pod` | Submit Proof of Delivery for a stop, enforcing the GPS-proximity check. |
-| 8 | `GET /api/clients` | List Client records, used to populate the dispatcher's client picker on job creation. |
-
-*(Updated for Part 2 — route-suggestion, SLA-breach detection, offline-batch conflict resolution, and fleet-performance aggregation endpoints from the original proposal are not yet built; the endpoints above are what's live and tested.)*
-
-## 4. POE feature fit *(Updated for Part 2)*
-
-| Requirement | Status as of Part 2 |
+| | Link |
 |---|---|
-| Single Sign-On | **Implemented.** Google Sign-In via Android Credential Manager, exchanged for a Firebase ID token, verified by the backend, issuing a role-scoped session JWT. |
-| Settings — at least three | **Partially implemented.** Each role has its own settings screen; currently covers theme (light/dark/system) and a language preference toggle (English/isiZulu — stored as a preference, full string-resource localisation not yet wired up). |
-| Biometric authentication | **Not yet implemented.** Reserved for the final POE per the assignment brief. |
-| Offline action and synchronisation | **Groundwork in place, not yet complete.** Room database and a driver-side `OfflineQueueManager`/`SyncWorker` exist; full queue-and-sync-on-reconnect behaviour is targeted for the final POE. |
-| Real-time notification | **Not yet implemented.** Reserved for the final POE (Firebase Cloud Messaging). |
-| Two South African languages | **Not yet implemented.** A language selector exists in Settings, but only English string resources currently exist — full isiZulu localisation is planned for the final POE. |
+| **Final POE demonstration video** | _add the unlisted YouTube link here_ |
+| Part 2 prototype video | https://youtu.be/W0VLYsKjTDo |
+| Release notes | [RELEASE_NOTES.md](RELEASE_NOTES.md) |
+| Release / Play Store process | [docs/RELEASE.md](docs/RELEASE.md) |
+| Play Store listing text | [docs/play-store/listing.md](docs/play-store/listing.md) |
 
-## 5. User-defined features implemented in Part 2
+**Group members**
 
-| # | Feature | Purpose and user value |
+| Name | Student number |
+|---|---|
+| Anjor Misser | ST10452806 |
+| Kiara Naidoo | ST10252256 |
+| Sayali Sookdeo | ST10458649 |
+| Iqra Nazir | ST10448362 |
+
+## Contents
+
+1. [Purpose and scope](#1-purpose-and-scope)
+2. [Features](#2-features)
+3. [Architecture and design decisions](#3-architecture-and-design-decisions)
+4. [Technology stack](#4-technology-stack)
+5. [Key feature implementations](#5-key-feature-implementations)
+6. [REST API](#6-rest-api)
+7. [Testing](#7-testing)
+8. [Version control and GitHub Actions](#8-version-control-and-github-actions)
+9. [Release and Play Store readiness](#9-release-and-play-store-readiness)
+10. [Running the project](#10-running-the-project)
+11. [Team contributions](#11-team-contributions)
+
+---
+
+## 1. Purpose and scope
+
+Small and medium courier operators in South Africa still coordinate deliveries with phone calls, WhatsApp groups and paper waybills. That leads to missed delivery windows, disputed proof of delivery, no live visibility for clients, and lost work when a driver is out of network coverage.
+
+**LocalMiles** is one Android app with three role-based views that share a single login and a single backend:
+
+| Role | What they do |
+|---|---|
+| **Dispatcher** (admin) | Creates jobs and stops, manages vehicles and drivers, promotes users, watches drivers on a live map and reviews delivery history. |
+| **Driver** | Works through assigned jobs stop by stop, captures proof of delivery (photo, signature, GPS) and keeps working when there is no signal. |
+| **Client** | Tracks their own shipments stop by stop. |
+
+The API does the heavy lifting: it verifies sign-in, enforces status rules and the GPS proximity rule, stores data, sends push notifications and applies offline actions.
+
+## 2. Features
+
+### Required features
+
+| Requirement | How it is met |
+|---|---|
+| Single sign-on | Google Sign-In (Credential Manager) → Firebase ID token → verified by the API → session JWT. |
+| Biometric authentication | Fingerprint/face prompt on app launch and an **Unlock with biometrics** button on the login screen (AndroidX Biometric). |
+| Settings | Per-role settings: theme (light / dark / system), language, biometric login, navigation app, screen-on and notification preferences. |
+| REST API + database | Express + TypeScript API on Render with a Supabase Postgres database. |
+| Offline mode with sync | Room queue + WorkManager auto-sync, with a Pending / Synced / Failed banner in the UI. |
+| Real-time notifications | Firebase Cloud Messaging pushes sent by the API on job, stop and sync events. |
+| Multi-language | English, Afrikaans and isiZulu. |
+
+### User-defined features
+
+| # | Feature | Value |
 |---|---|---|
-| 1 | Fleet management | Dispatcher can add vehicles, edit their details, and toggle active/inactive status, directly affecting what's assignable to a job. |
-| 2 | Driver promotion workflow | A dispatcher can promote any client-role user to a driver in one flow, which creates the linked driver record and flips their role atomically. |
-| 3 | Sequenced delivery-stop workflow | Stops must be actioned strictly in the dispatcher's sequence order — a driver can't jump ahead to a later stop, with a live "Stop X of N" progress counter. |
-| 4 | Client self-service tracking | Clients see their own shipment's live status and a stop-by-stop progress view against the dispatcher's registered stops. |
-| 5 | Delivery history and live map | Dispatcher can review completed/cancelled jobs and see driver/vehicle positions on a live map. |
+| 1 | Fleet management | Dispatcher adds, edits and activates/deactivates vehicles. |
+| 2 | Driver promotion workflow | Promote a client user to a driver in one step (creates the driver record and changes the role). |
+| 3 | Sequenced delivery stops | Stops must be done in order, with a live "Stop X of N" counter. |
+| 4 | Client shipment tracking | Clients see live status and stop-by-stop progress. |
+| 5 | Delivery history and live map | Dispatcher reviews finished jobs and sees driver positions on an OpenStreetMap live map. |
+| 6 | Live driver location sharing | Drivers share their position while a job is en route. |
+| 7 | Proof of delivery with GPS check | Photo + signature + the phone's real location; rejected if more than 200 m from the stop. |
 
-*(Updated for Part 2 — the original proposal's route-optimisation-suggestion and in-app driver–dispatcher chat features are not yet built; the five features above are what's implemented and demonstrable in the current prototype.)*
+### Screenshots
 
-## 6. Comparable Android apps
+<!--
+  Sayali: add the screenshots to docs/screenshots/ using the file names in docs/SHOT_LIST.md,
+  then remove the comment markers around the tables below so they show up.
 
-Unchanged from the Part 1 research — see the full comparative analysis in the Research Report (Route4Me Route Planner, Onfleet Driver, Track-POD Delivery Driver App).
+| Login | Biometric unlock | Settings |
+|---|---|---|
+| ![Login](docs/screenshots/01-login.png) | ![Biometric](docs/screenshots/02-biometric.png) | ![Settings](docs/screenshots/03-settings.png) |
 
-## 7. Feasibility — actual technology used *(Updated for Part 2)*
+| Driver stops | Offline banner | POD capture |
+|---|---|---|
+| ![Stops](docs/screenshots/04-driver-stops.png) | ![Offline](docs/screenshots/05-offline-banner.png) | ![POD](docs/screenshots/06-pod.png) |
 
-- **Android stack:** Kotlin, Jetpack Compose, Retrofit2 + OkHttp + Gson, Room, WorkManager, Firebase Authentication, Google Maps Compose, Hilt.
-- **API technology:** ~~ASP.NET Core Web API (C#)~~ **Express 5 + TypeScript**, following a controller-based structure with role-based middleware.
-- **Database:** ~~SQL Server via Entity Framework Core~~ **Supabase (Postgres)**, accessed via the Supabase JS client.
-- **Hosting:** ~~Azure App Service / Azure SQL~~ **Render** (API), **Supabase** (database).
-- **Authentication:** ~~OAuth2/OpenID Connect SSO (Google/Microsoft Azure AD) + JWT~~ **Firebase Authentication (Google Sign-In) + a custom session JWT** issued by the backend after Firebase ID-token verification.
-- **Key SDKs actually used:** Firebase Auth, Google Maps Compose, Retrofit/OkHttp, MockK + kotlinx-coroutines-test (unit testing), GitHub Actions (CI).
+| Dispatcher live map | Fleet | Client tracking |
+|---|---|---|
+| ![Map](docs/screenshots/07-live-map.png) | ![Fleet](docs/screenshots/08-fleet.png) | ![Tracking](docs/screenshots/09-client-tracking.png) |
+-->
 
-*(Updated for Part 2 — the stack changed from the originally proposed ASP.NET Core/SQL Server/Azure combination to a Node.js/TypeScript/Supabase/Render stack, decided during early Part 2 build-out.)*
+## 3. Architecture and design decisions
 
-**Scope check — what was actually deferred:** matching the original scope-check decision, route optimisation and the driver–dispatcher chat feature were the first things deferred, along with the four items explicitly marked "(POE only)" in the assignment brief: biometric authentication, full offline sync, push notifications, and multi-language support. The core dispatcher → driver → client job/stop/POD loop was kept intact and fully working, per the original priority.
+```mermaid
+flowchart LR
+    subgraph Phone["Android app (Kotlin, Jetpack Compose)"]
+        UI["Compose screens"] --> VM["ViewModels"]
+        VM --> Repo["Repositories"]
+        Repo --> Retrofit["Retrofit / OkHttp"]
+        VM --> Queue["OfflineQueueManager"]
+        Queue --> Room[("Room database")]
+        Worker["SyncWorker (WorkManager)"] --> Queue
+    end
+    Retrofit -->|"HTTPS + JWT"| API["REST API (Express + TypeScript, Render)"]
+    Worker -->|"POST /api/sync"| API
+    UI -.->|"Google SSO"| Firebase["Firebase Authentication"]
+    API -->|"verify ID token"| Firebase
+    API --> DB[("Supabase Postgres")]
+    API --> Blob[("Supabase Storage: POD photos")]
+    API -->|"push"| FCM["Firebase Cloud Messaging"]
+    FCM --> Phone
+```
 
-### Lecturer decision
+**Why it is built this way**
 
-- [ ] Approved
-- [ ] Approved with changes
-- [ ] Revise and resubmit
+- **MVVM with repositories.** Screens only show state from a ViewModel; repositories wrap the API; no screen talks to Retrofit directly.
+- **The API is the source of truth.** Status transitions, the GPS proximity rule and role access are enforced on the server, so the app cannot bypass them.
+- **One theme.** All colours come from `MaterialTheme.colorScheme` (see `Core/theme`), so every screen and both light and dark mode use the same palette: dark teal `#004759`, green `#018B58`, lime `#8AC237`, orange `#F28800`.
+- **Offline first for drivers.** Drivers' actions are written to Room first when there is no connection and the server applies them later in order.
 
-**Conditions or comments:**
+## 4. Technology stack
+
+| Area | Technology |
+|---|---|
+| App | Kotlin, Jetpack Compose, Material 3, Navigation Compose, minSdk 34 |
+| Networking | Retrofit 2, OkHttp, Gson |
+| Local storage and background work | Room, WorkManager |
+| Authentication | Firebase Authentication, Credential Manager, AndroidX Biometric |
+| Notifications | Firebase Cloud Messaging |
+| Maps and location | OpenStreetMap (osmdroid), Google Play Services Location |
+| API | Node.js, Express 5, TypeScript |
+| Database and storage | Supabase (Postgres + Storage bucket `pod-uploads`) |
+| Hosting | Render |
+| Testing / CI | JUnit, MockK, kotlinx-coroutines-test, GitHub Actions |
+
+## 5. Key feature implementations
+
+### Single sign-on and biometrics
+The app gets a Google credential, exchanges it for a Firebase ID token and sends it to `POST /api/auth/login`. The API verifies it and returns a session JWT and the user's role. When biometric login is on, a signed-out user keeps their saved session on the phone so the login screen can offer **Unlock with biometrics**; with it off, signing out wipes the session.
+
+### Offline mode and sync
+1. When a driver action fails because there is no network (job status, stop status or proof of delivery), `DriverViewModel` saves it to Room through `OfflineQueueManager` as **Pending**.
+2. The screen updates straight away (optimistic update) and a banner shows *"N change(s) saved offline, waiting to sync"*.
+3. `SyncWorker` is scheduled with a "network connected" constraint, so WorkManager runs it as soon as the connection returns.
+4. The worker sends the pending actions to `POST /api/sync` oldest first, 50 at a time. Each result marks the action **Synced** or **Failed**. Network errors are retried with exponential backoff.
+5. Failed actions show **Retry** and **Dismiss**. Retry re-queues them under a new id.
+6. Actions are tagged with the user who made them, so a different account never sends them. Lists are loaded from the server and then overlaid with unsynced changes so they never flip back.
+
+### Proof of delivery
+The driver enters the recipient, takes a photo and signs on screen. The phone reads its real GPS position; the app checks the 200 m limit locally (so it works offline) and the API checks it again. Photos are shrunk before upload; offline, they travel inside the sync request as base64.
+
+### Notifications
+Devices register their FCM token with `POST /api/devices/token`. The API sends pushes through Firebase Cloud Messaging (job assignment, status changes, failed deliveries, sync issues) and also stores them for the in-app list.
+
+### Languages
+`values/` (English), `values-af/` (Afrikaans) and `values-zu/` (isiZulu). The language is chosen in Settings and applied app-wide.
+
+## 6. REST API
+
+Base URL: `https://localmiles-api.onrender.com/api/` · Every route except login needs `Authorization: Bearer <jwt>`.
+
+| Area | Routes |
+|---|---|
+| Auth and users | `POST /auth/login`, `PATCH /auth/switch-role`, `GET /users`, `PATCH /users/me`, `PATCH /users/:id/role` |
+| Clients, depots | `GET/POST /clients`, `GET/POST/PATCH/DELETE /depots` |
+| Drivers and vehicles | `GET/POST/PATCH/DELETE /drivers`, `POST /drivers/me/location`, `GET/POST/PATCH/DELETE /vehicles` |
+| Jobs | `GET/POST /jobs`, `PATCH /jobs/:id`, `PATCH /jobs/:id/status`, `GET /jobs/:id/route`, `GET /jobs/:id/driver-location` |
+| Stops | `GET/POST /jobs/:jobId/stops`, `PATCH /stops/:id`, `PATCH /stops/:id/status` |
+| Proof of delivery | `POST/GET /stops/:stopId/pod`, `GET /jobs/:jobId/pods` |
+| Notifications and devices | `GET/POST /notifications`, `POST /devices/token` |
+| Offline sync | `POST /sync`, `GET /sync`, `GET /sync/:id`, `POST /sync/:id/retry` |
+
+The API lives on the `Backend-API` branch (folder `localmiles-api/`).
+
+## 7. Testing
+
+| Where | What |
+|---|---|
+| `app/src/test` (JVM) | Offline queue (`OfflineQueueManagerTest`), pending-change overlay (`OfflineOverlayTest`), distance rule (`PodLocationTest`), biometric and language preferences, dispatcher view models, API error messages, history filter, live map model and form validation. |
+| `app/src/androidTest` | `OfflineActionDaoTest` runs the Room queries on a real in-memory database (needs a phone or emulator). |
+| `localmiles-api/test` | API status rules, auth middleware and sync handling (`npm test`). |
+
+Run the app unit tests with `./gradlew testDebugUnitTest`.
+
+## 8. Version control and GitHub Actions
+
+- All work is committed to this GitHub repository (no zip uploads) by all four team members, on feature branches merged into `LocalMiles-App`.
+- The final submission commit must be tagged **`Final-POE`** (steps in [docs/RELEASE.md](docs/RELEASE.md)).
+- **Android CI** ([`.github/workflows/android-ci.yml`](.github/workflows/android-ci.yml)) runs on **every push to any branch**, on tags and on pull requests:
+  1. Runs the unit tests (`testDebugUnitTest`)
+  2. Builds the debug APK
+  3. Builds the release APK (signed when the signing secrets exist, otherwise unsigned)
+  4. Uploads the test report and the APKs as artifacts
+  5. A second job checks out the `Backend-API` branch, type-checks it and runs the API tests
+
+## 9. Release and Play Store readiness
+
+- **Version 2.0.0** (`versionCode 2`).
+- **Custom icon**: adaptive icon (lime pin over an orange road on dark teal) with a monochrome layer for themed icons. The Play Store icon and feature graphic are in [`docs/branding`](docs/branding).
+- **Signed release build** with a private upload key that is never committed (`keystore.properties` is git-ignored). The release app talks to the hosted API over HTTPS.
+- Store text, data-safety answers and a privacy policy draft are in [`docs/play-store`](docs/play-store). The signing steps are in [`docs/RELEASE.md`](docs/RELEASE.md).
+
+## 10. Running the project
+
+1. Open the project in Android Studio and let Gradle sync.
+2. Add to `local.properties` (git-ignored):
+   ```properties
+   GOOGLE_WEB_CLIENT_ID=<web client id from the Firebase console>
+   API_BASE_URL=http://<your PC's LAN IP>:3000/api/
+   ```
+3. Run the API (`Backend-API` branch): `npm install`, copy `.env`, `npm run dev`.
+4. Run the `app` configuration on a **physical phone** on the same Wi-Fi as the PC.
+
+Debug builds use the shared `app/debug.keystore`, so the Firebase SHA-1 is the same on every machine.
+
+## 11. Team contributions
+
+| Member | Area |
+|---|---|
+| Anjor Misser | REST API, SSO, dispatcher and driver workflows, push notifications, location tracking, offline sync integration, release signing |
+| Kiara Naidoo | Biometric authentication, multi-language support |
+| Iqra Nazir | Room database for the offline queue |
+| Sayali Sookdeo | UI consistency, release preparation, documentation |
+
+Full change history: [RELEASE_NOTES.md](RELEASE_NOTES.md).

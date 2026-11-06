@@ -14,6 +14,14 @@ val localProps = Properties().apply {
     if (f.exists()) FileInputStream(f).use { load(it) }
 }
 
+// Release signing details come from keystore.properties (not committed) or from env variables on CI
+// If they are missing the release build just stays unsigned
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
+}
+fun signingValue(key: String, env: String): String? = keystoreProps.getProperty(key) ?: System.getenv(env)
+
 android {
     namespace = "com.example.localmiles"
     compileSdk {
@@ -24,8 +32,8 @@ android {
         applicationId = "com.example.localmiles"
         minSdk = 34
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -62,10 +70,25 @@ android {
         }
     }
 
+    // key used to sign the release APK (never committed)
+    signingConfigs {
+        create("release") {
+            signingValue("storeFile", "LOCALMILES_KEYSTORE_FILE")?.let { storeFile = file(it) }
+            storePassword = signingValue("storePassword", "LOCALMILES_KEYSTORE_PASSWORD")
+            keyAlias = signingValue("keyAlias", "LOCALMILES_KEY_ALIAS")
+            keyPassword = signingValue("keyPassword", "LOCALMILES_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             optimization {
                 enable = false
+            }
+            // release talks to the hosted API, not my PC's IP
+            buildConfigField("String", "API_BASE_URL", "\"https://localmiles-api.onrender.com/api/\"")
+            if (signingValue("storeFile", "LOCALMILES_KEYSTORE_FILE") != null) {
+                signingConfig = signingConfigs.getByName("release")
             }
         }
     }

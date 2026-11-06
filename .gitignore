@@ -16,3 +16,7 @@ local.properties
 
 # Personal VS Code launch task
 /.vscode/tasks.json
+
+# Release signing: never commit the keystore or its passwords
+keystore.properties
+*.jks
