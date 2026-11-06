@@ -1,11 +1,11 @@
 # Render blueprint for the LocalMiles API.
-# Render dashboard: New > Blueprint > pick this repo and the Backend-API branch.
+# Render dashboard: New > Blueprint > pick this repo and the main branch.
 services:
   - type: web
     name: localmiles-api
     runtime: node
     rootDir: localmiles-api
-    branch: Backend-API
+    branch: main
     plan: free
     # dev dependencies are needed because the build runs tsc
     buildCommand: npm ci --include=dev && npm run build
