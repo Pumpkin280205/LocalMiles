@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.localmiles.Core.Auth.GoogleAuthClient
 import com.example.localmiles.Core.Auth.SignInCancelled
 import com.example.localmiles.Core.Data.Repository.AuthRepository
+import com.example.localmiles.Core.Location.DriverLocationService
+import com.example.localmiles.Core.Notifications.PushTokenRegistrar
 import com.example.localmiles.Core.Utils.Result
 import com.example.localmiles.Core.Utils.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,7 +47,11 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val firebaseIdToken = googleAuth.signInAndGetFirebaseIdToken(activityContext)
                 when (val r = authRepo.login(firebaseIdToken)) {
-                    is Result.Success -> _state.value = AuthUiState.Success(r.data.role)
+                    is Result.Success -> {
+                        // Link this phone to the account so the API's pushes reach it.
+                        PushTokenRegistrar.register(getApplication())
+                        _state.value = AuthUiState.Success(r.data.role)
+                    }
                     is Result.Error -> _state.value = AuthUiState.Error(r.message)
                 }
             } catch (e: SignInCancelled) {
@@ -61,6 +67,9 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun logout() {
+        // Both need the session, so they run before it's cleared.
+        PushTokenRegistrar.unregister(getApplication())
+        DriverLocationService.stop(getApplication())
         googleAuth.signOut()
         authRepo.logout()
         _state.value = AuthUiState.Idle

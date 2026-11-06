@@ -29,7 +29,11 @@ object RetrofitClient {
             // Never attach a token to the login endpoint itself
             val requestBuilder = originalRequest.newBuilder()
             val token = sessionManager.getToken()
-            if (!token.isNullOrBlank() && !originalRequest.url.encodedPath.contains("auth/login")) {
+            // Calls that pass their own Authorization (logout's token unregister) keep it.
+            if (!token.isNullOrBlank() &&
+                originalRequest.header("Authorization") == null &&
+                !originalRequest.url.encodedPath.contains("auth/login")
+            ) {
                 requestBuilder.addHeader("Authorization", "Bearer $token")
             }
             requestBuilder.addHeader("Content-Type", "application/json")

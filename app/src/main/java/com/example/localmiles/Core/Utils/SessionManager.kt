@@ -5,8 +5,10 @@ import android.content.SharedPreferences
 
 class SessionManager(context: Context) {
 
+    private val appContext = context.applicationContext
+
     private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     //Persist the bearer token returned by `auth/login`.
     fun saveToken(token: String) {
@@ -31,8 +33,10 @@ class SessionManager(context: Context) {
 
     fun isLoggedIn(): Boolean = !getToken().isNullOrBlank()
 
-    //Wipe everything on logout.
+    // Wipe everything on logout, unless biometric login is on: then the session stays on the
+    // phone so the login screen can offer "Unlock with biometrics".
     fun clear() {
+        if (BiometricPreferences.isEnabled(appContext)) return
         prefs.edit().clear().apply()
     }
 

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import com.example.localmiles.Core.Network.Dto.StopResponse
+import android.util.Log
 
 // Represents all the information needed by the client screens
 data class ClientDashboardUiState(
@@ -41,6 +42,9 @@ class ClientViewModel(
             when (val result = jobRepository.getJobs(mine = true)) {
 
                 is Result.Success -> {
+                    Log.d("ClientViewModel", "Client jobs loaded: ${result.data.size}")
+                    println("CLIENT JOBS LOADED: ${result.data.size}")
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         jobs = result.data,
@@ -126,6 +130,7 @@ class ClientViewModel(
                 }
 
                 is Result.Error -> {
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         errorMessage = jobResult.message
@@ -140,4 +145,16 @@ class ClientViewModel(
         )
     }
 }
+class ClientViewModelFactory(
+    private val jobRepository: JobRepository
+) : androidx.lifecycle.ViewModelProvider.Factory {
 
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ClientViewModel::class.java)) {
+            return ClientViewModel(jobRepository) as T
+        }
+
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}

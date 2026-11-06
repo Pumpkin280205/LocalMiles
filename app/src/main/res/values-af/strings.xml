@@ -1,0 +1,54 @@
+
+<resources>
+    <string name="app_name">LocalMiles</string>
+    <string name="unlock_biometric">Ontsluit met biometrie</string>
+    <string name="sign_in_google">Meld aan met Google</string>
+    <string name="settings">Instellings</string>
+    <string name="preferences">Voorkeure</string>
+    <string name="manage_experience">Bestuur jou LocalMiles-ervaring.</string>
+    <string name="authentication_required">Verifikasie vereis</string>
+    <string name="authentication_login_message">Meld asseblief weer aan om toegang tot jou rekening te verkry.</string>
+    <string name="continue_to_login">Gaan voort na aanmelding</string>
+    <string name="language">Taal</string>
+    <string name="choose_language">Kies jou voorkeurtoepassingstaal.</string>
+    <string name="english">Engels</string>
+    <string name="afrikaans">Afrikaans</string>
+    <string name="isizulu">isiZulu</string>
+    <string name="biometric_prompt_title">Local Miles-verifikasie</string>
+    <string name="biometric_prompt_subtitle">Verifieer jou identiteit om toegang tot jou rekening te kry</string>
+    <string name="biometric_prompt_description">Gebruik jou vingerafdruk of gesig om voort te gaan.</string>
+    <string name="biometric_cancel">Kanselleer</string>
+    <string name="biometric_no_hardware">Hierdie toestel ondersteun nie biometriese verifikasie nie.</string>
+    <string name="biometric_hardware_unavailable">Biometriese hardeware is tans nie beskikbaar nie.</string>
+    <string name="biometric_none_enrolled">Geen vingerafdruk of gesig is op hierdie toestel geregistreer nie.</string>
+    <string name="biometric_security_update">’n Sekuriteitsopdatering word vereis voordat biometriese verifikasie gebruik kan word.</string>
+    <string name="biometric_unsupported">Biometriese verifikasie word nie op hierdie toestel ondersteun nie.</string>
+    <string name="biometric_status_unknown">Die status van biometriese verifikasie is tans onbekend.</string>
+    <string name="biometric_generic_unavailable">Biometriese verifikasie is tans nie beskikbaar nie.</string>
+    <string name="security">Sekuriteit</string>
+    <string name="security_description">Beskerm toegang tot jou LocalMiles-rekening.</string>
+    <string name="biometric_login">Biometriese aanmelding</string>
+    <string name="biometric_description">Gebruik jou vingerafdruk of gesig om jou rekening te ontsluit.</string>
+    <string name="biometric_unavailable">Biometriese verifikasie is nie beskikbaar nie.</string>
+    <string name="enrol_biometric">Registreer biometriese verifikasie</string>
+    <string name="biometric_enabled">Biometriese aanmelding is geaktiveer.</string>
+
+    <string name="notifications">Kennisgewings</string>
+    <string name="notifications_description">Kies watter opdaterings jy wil ontvang.</string>
+    <string name="delivery_notifications">Afleweringskennisgewings</string>
+    <string name="default_notifications_description">Ontvang versendingstatus- en afleweringsopdaterings.</string>
+
+    <string name="appearance">Voorkoms</string>
+    <string name="appearance_description">Kies hoe LocalMiles op hierdie toestel lyk.</string>
+    <string name="system_default">Stelselverstek</string>
+    <string name="light">Lig</string>
+    <string name="dark">Donker</string>
+
+    <string name="data_usage">Datagebruik</string>
+    <string name="data_usage_description">Beheer hoe LocalMiles mobiele data gebruik.</string>
+    <string name="data_saver">Databesparing</string>
+    <string name="data_saver_description">Verminder agtergronddatagebruik op beperkte verbindings.</string>
+
+    <string name="local_miles_tagline">Lewer plaaslik. Ry verder.</string>
+    <string name="local_miles_features">Veilig • Betroubaar • Gekoppel</string>
+</resources>

@@ -29,22 +29,32 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Google/Firebase Web client ID used as serverClientId for Credential Manager.
+        // Set GOOGLE_WEB_CLIENT_ID in local.properties (see Firebase console -> Auth -> Google -> Web SDK config).
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
             "\"${localProps.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"",
         )
 
+        // API base URL. Defaults to 10.0.2.2, the emulator's alias for the host machine's
+        // localhost, so it works out of the box when running the API on your own PC.
+        // On a physical device (or if the API runs elsewhere), set API_BASE_URL in
+        // local.properties to your machine's LAN IP, e.g.:
+        //   API_BASE_URL=http://192.168.1.23:3000/api/
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"${localProps.getProperty("API_BASE_URL") ?: "http://10.0.2.2:3000/api/"}\"",
+            "\"${localProps.getProperty("API_BASE_URL") ?: "//192.168.1.23:3000/api/"}\"",
         )
     }
 
+    // Shared debug keystore (app/debug.keystore) so every developer's debug build
+    // has the same SHA-1, which is what's registered in the Firebase console.
+    // Without this, Gradle falls back to each machine's own auto-generated
+    // ~/.android/debug.keystore, and Google sign-in fails with an unregistered SHA-1.
     signingConfigs {
         getByName("debug") {
-
             storeFile = file("debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -79,6 +89,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)
+    testImplementation("io.mockk:mockk:1.13.13")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -92,6 +104,7 @@ dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.01.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
@@ -105,9 +118,9 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // Offline storage (Sayali's sync layer)
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")   // annotation processor
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     // Background sync
     implementation("androidx.work:work-runtime-ktx:2.10.0")
@@ -116,6 +129,9 @@ dependencies {
     implementation("com.google.maps.android:maps-compose:6.4.1")
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    // OpenStreetMap tiles for the dispatcher Live Map — no API key needed, so
+    // the map renders for every developer and marker out of the box.
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 
     // Image loading — POD photos, profile images
     implementation("io.coil-kt:coil-compose:2.7.0")
