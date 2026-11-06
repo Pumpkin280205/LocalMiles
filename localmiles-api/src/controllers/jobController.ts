@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { supabase } from '../supabaseClient.js';
 import { parseId, writeError, posInt, isIsoDate, driverIdForUser, clientIdForUser, userCanAccessJob } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
-import { notifyJobAssigned, notifyJobCompleted, type JobForNotify } from '../lib/notifications.js';
+import { notifyJobAssigned, notifyJobCompleted, notifyJobEnRoute, type JobForNotify } from '../lib/notifications.js';
 
 const TABLE = 'DeliveryJob';
 const PK = 'JobId';
@@ -44,11 +44,13 @@ export type JobSnapshot = JobForNotify & { Status: string };
  * Assigned with a driver, or when an, Assigned job is handed to a different driver; 
  * "completed" fires on the move into Completed. Pure, so it's unit-testable.
  */
-export function jobNotificationEvents(before: JobSnapshot | null, after: JobSnapshot): ('assigned' | 'completed')[] {
-  const events: ('assigned' | 'completed')[] = [];
+export function jobNotificationEvents(before: JobSnapshot | null, after: JobSnapshot): ('assigned' | 'enroute' | 'completed')[] {
+  const events: ('assigned' | 'enroute' | 'completed')[] = [];
   if (after.Status === 'Assigned' && after.DriverId !== null &&
       (before === null || before.Status !== 'Assigned' || before.DriverId !== after.DriverId))
     events.push('assigned');
+  if (after.Status === 'EnRoute' && before?.Status !== 'EnRoute')
+    events.push('enroute');
   if (after.Status === 'Completed' && before?.Status !== 'Completed')
     events.push('completed');
   return events;
@@ -59,6 +61,7 @@ export async function notifyJobChange(before: JobSnapshot | null, after: JobSnap
   for (const event of jobNotificationEvents(before, after)) {
     console.log(`Job ${after.JobId}: sending '${event}' notifications`);
     if (event === 'assigned') await notifyJobAssigned(after);
+    else if (event === 'enroute') await notifyJobEnRoute(after);
     else await notifyJobCompleted(after);
   }
 }

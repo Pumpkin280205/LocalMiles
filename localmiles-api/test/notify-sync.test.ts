@@ -41,6 +41,13 @@ test('completing a job sends "completed" once', () => {
   assert.deepEqual(jobNotificationEvents(done, done), []);
 });
 
+test('starting a job sends "enroute" once', () => {
+  const assigned = job({ Status: 'Assigned', DriverId: 9 });
+  const enRoute = job({ Status: 'EnRoute', DriverId: 9 });
+  assert.deepEqual(jobNotificationEvents(assigned, enRoute), ['enroute']);
+  assert.deepEqual(jobNotificationEvents(enRoute, enRoute), []);
+});
+
 test('a job created already Assigned to a driver notifies', () => {
   assert.deepEqual(jobNotificationEvents(null, job({ Status: 'Assigned', DriverId: 9 })), ['assigned']);
   assert.deepEqual(jobNotificationEvents(null, job()), []);

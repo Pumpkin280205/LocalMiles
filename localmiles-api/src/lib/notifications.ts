@@ -84,6 +84,35 @@ export async function notifyJobAssigned(job: JobForNotify): Promise<void> {
   await insertNotifications(rows);
 }
 
+//Driver started the job: tell the client (and dispatchers) the delivery is on its way. */
+export async function notifyJobEnRoute(job: JobForNotify): Promise<void> {
+  const ref = job.ReferenceNumber ?? `#${job.JobId}`;
+  const rows: NotificationRow[] = [];
+
+  const clientUserId = await userIdForClientId(job.ClientId);
+  if (clientUserId !== null) {
+    rows.push({
+      UserId: clientUserId,
+      Title: 'Driver on the way',
+      Message: `Your driver is on the way with job ${ref}.`,
+      NotificationType: 'JobEnRoute',
+      RelatedEntityId: String(job.JobId),
+    });
+  }
+
+  for (const adminId of await adminUserIds()) {
+    rows.push({
+      UserId: adminId,
+      Title: 'Driver en route',
+      Message: `Job ${ref} is now en route.`,
+      NotificationType: 'JobEnRoute',
+      RelatedEntityId: String(job.JobId),
+    });
+  }
+
+  await insertNotifications(rows);
+}
+
 //Job moved to Completed: notify the client and dispatchers. */
 export async function notifyJobCompleted(job: JobForNotify): Promise<void> {
   const ref = job.ReferenceNumber ?? `#${job.JobId}`;

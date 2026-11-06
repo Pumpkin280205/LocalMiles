@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient.js';
 import { parseId, writeError, posInt, isIsoDate, driverIdForUser, userCanAccessJob } from '../lib/db.js';
 import { ROLE } from '../middleware/auth.js';
 import { haversineKm } from '../lib/geo.js';
+import { notifyJobChange } from './jobController.js';
 
 const TABLE = 'ProofOfDelivery';
 const PK = 'PodId';
@@ -95,6 +96,21 @@ export type PodResult =
  * files to blob storage, insert the row, mark the stop Completed. Used by the
  * live endpoint and by offline sync, so both enforce exactly the same rules.
  */
+//When no stop is left to do, an EnRoute job becomes Completed (and the client is told). Best-effort. */
+export async function completeJobIfDone(jobId: number, stopId: number): Promise<void> {
+  const { data: stops } = await supabase.from('DeliveryStop').select('Status').eq('JobId', jobId);
+  if (!stops?.length || !stops.some((s) => s.Status === 'Completed')) return;
+  if (stops.some((s) => !['Completed', 'Failed', 'Cancelled'].includes(s.Status))) return;
+
+  const { data: job } = await supabase
+    .from('DeliveryJob').select('JobId, ClientId, DriverId, Status, ReferenceNumber').eq('JobId', jobId).maybeSingle();
+  if (!job || job.Status !== 'EnRoute') return;
+
+  const { error } = await supabase.from('DeliveryJob').update({ Status: 'Completed' }).eq('JobId', jobId).eq('Status', 'EnRoute');
+  if (error) { console.error(`Could not complete job ${jobId} after POD for stop ${stopId}:`, error); return; }
+  await notifyJobChange(job, { ...job, Status: 'Completed' });
+}
+
 export async function createPod(
   user: { id: string; role: string },
   stopId: number,
@@ -104,7 +120,7 @@ export async function createPod(
   // Look up the stop and the driver assigned to its parent job.
   const { data: stop, error: stopErr } = await supabase
     .from('DeliveryStop')
-    .select('StopId, Latitude, Longitude, DeliveryJob(DriverId)')
+    .select('StopId, JobId, Latitude, Longitude, DeliveryJob(DriverId)')
     .eq('StopId', stopId)
     .maybeSingle();
   if (stopErr) return { ok: false, status: 500, error: 'Database error', dbError: stopErr };
@@ -190,6 +206,8 @@ export async function createPod(
     .from('DeliveryStop')
     .update({ Status: 'Completed', CompletedAt: new Date().toISOString() })
     .eq('StopId', stopId);
+
+  await completeJobIfDone((stop as any).JobId, stopId);
 
   return { ok: true, pod: data };
 }
