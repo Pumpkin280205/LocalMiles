@@ -15,7 +15,7 @@ import com.example.localmiles.Common.Components.SettingsAction
 import com.example.localmiles.Screens.Driver.Sync.OfflineQueueManager
 
 /**
- * Driver dashboard with offline synchronization status.
+ * Driver dashboard displaying offline synchronization information.
  *
  * References:
  * Android Developers (2026) State and Jetpack Compose.
@@ -32,15 +32,17 @@ fun DriverDashboardScreen(
 ) {
     val context = LocalContext.current
 
-    // Reuse the same queue manager while this screen is displayed.
+    // Create the queue manager using its updated factory method.
     val offlineQueueManager = remember(context) {
-        OfflineQueueManager(context)
+        OfflineQueueManager.create(context)
     }
 
-    // Automatically update the UI when the number of pending actions changes.
-    val pendingCount by offlineQueueManager
-        .observePendingCount()
-        .collectAsState(initial = 0)
+    // Observe the real Room synchronization summary.
+    val syncSummary by remember(offlineQueueManager) {
+        offlineQueueManager.observeSummary()
+    }.collectAsState(
+        initial = com.example.localmiles.Screens.Driver.Sync.SyncSummary()
+    )
 
     Scaffold(
         topBar = {
@@ -71,7 +73,6 @@ fun DriverDashboardScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // OFFLINE SYNCHRONIZATION STATUS
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -87,38 +88,37 @@ fun DriverDashboardScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        text = if (pendingCount > 0) {
-                            "Pending Sync: $pendingCount action(s)"
-                        } else {
-                            "No pending actions"
-                        },
-                        color = if (pendingCount > 0) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
-                    )
+                    Text("Pending: ${syncSummary.pending}")
+                    Text("Synced: ${syncSummary.synced}")
+                    Text("Failed: ${syncSummary.failed}")
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = if (pendingCount > 0) {
-                            "Updates will synchronize when internet returns."
-                        } else {
-                            "All queued updates have been processed."
+                        text = when {
+                            syncSummary.pending > 0 ->
+                                "Updates are waiting to synchronize."
+
+                            syncSummary.failed > 0 ->
+                                "Some updates failed. Please retry."
+
+                            else ->
+                                "No pending or failed updates."
                         },
                         style = MaterialTheme.typography.bodySmall
                     )
 
-                    if (pendingCount > 0) {
+                    if (
+                        syncSummary.pending > 0 ||
+                        syncSummary.failed > 0
+                    ) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Button(
                             onClick = {
-                                offlineQueueManager.scheduleSync()
+                                OfflineQueueManager.schedule(context)
                             }
                         ) {
                             Text("Retry Sync")
