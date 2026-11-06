@@ -233,4 +233,30 @@ Debug builds use the shared `app/debug.keystore`, so the Firebase SHA-1 is the s
 | Iqra Nazir | Room database for the offline queue |
 | Sayali Sookdeo | UI consistency, release preparation, documentation |
 
+## Part 3 – Final Application Development
+
+### Biometric Authentication
+For the final development of LocalMiles, we added biometric authentication to improve the security of the application. This allows users to unlock the app using their fingerprint or facial recognition after completing Google Sign-In. We also included an option in Settings that allows users to enable or disable biometric authentication according to their preference.
+
+### Offline Mode and Synchronisation
+We improved LocalMiles to support drivers who work in areas where internet connectivity is unreliable. Room Database is used to store actions locally, such as delivery status updates and Proof of Delivery submissions. These actions are added to an offline queue and synchronised with the backend using WorkManager once an internet connection becomes available. We also included synchronisation indicators so users can identify which actions are still pending and which have been successfully synchronised.
+
+### Push Notifications
+We integrated Firebase Cloud Messaging to allow LocalMiles to send and receive push notifications. This helps keep users informed about important delivery activities, including job assignments and delivery status updates. The application registers its Firebase notification token with the backend so notifications can be directed to the correct device.
+
+### NoSQL Database
+We integrated Firebase Firestore alongside our existing Supabase PostgreSQL database. Firestore provides NoSQL data storage for the selected application functionality, allowing data to be stored and retrieved using a document-based structure. Supabase PostgreSQL continues to manage the application's existing relational data.
+
+### Blob Storage
+We incorporated cloud blob storage to manage Proof of Delivery photographs. Instead of storing image files directly in the main database, the application uploads them to cloud storage and keeps the associated image reference for later retrieval. This helps separate file storage from the application's main database records.
+
+### Multi-language Support
+We extended the Settings functionality to support multiple South African languages. Users can select their preferred language through the language picker. This improves accessibility by allowing users to interact with the application in a language they are more comfortable using.
+
+### Automated Build and Testing
+We configured GitHub Actions to automate the Android build and testing process. Whenever changes are pushed to the remote GitHub repository, the workflow runs automatically to check whether the application builds successfully and whether the configured unit tests pass. This helps us identify issues earlier during development.
+
+### Application Release and Final UI
+We improved the overall appearance of LocalMiles by working on the application icon, visual assets, colours, fonts and input validation. We also prepared the signed release APK and Play Store screenshots and listing as part of the final release preparation. Testing on a physical Android device was included to check the application's functionality outside the emulator.
+
 Full change history: [RELEASE_NOTES.md](RELEASE_NOTES.md).
